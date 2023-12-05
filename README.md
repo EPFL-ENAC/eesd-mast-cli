@@ -5,3 +5,17 @@ MAST (MAsonry Shake-Table) is a comprehensive database and collaborative resourc
 Visit [EESD lab at EPFL](https://www.epfl.ch/labs/eesd/).
 
 This tool is a command-line interface to the MAST API, for data upload, extraction and analysis.
+
+## Development
+
+Setup package dependencies
+
+```
+poetry install
+```
+
+Run command line
+
+```
+poetry run mast --help
+```

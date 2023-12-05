@@ -1,10 +1,12 @@
 import typer
-from logging import DEBUG, INFO, basicConfig
+from logging import DEBUG, INFO, NOTSET, basicConfig
 from mast.core.upload import do_upload
 from mast.services.references import ReferencesService
 from mast.services.experiments import ExperimentsService
 from mast.core.io import APIConnector
 import json
+import pandas as pd
+import sys
 
 # Initialise the Typer class
 app = typer.Typer(
@@ -34,7 +36,7 @@ def upload(
 
     The Excel file must have the following columns: x, y, z
     """
-    do_upload(filename, key, url)
+    do_upload(APIConnector(url, key), filename)
 
 #
 # References
@@ -62,6 +64,10 @@ def reference(
 
 @app.command()
 def references(
+    format: str = typer.Option(
+        "json",
+        help="Format of the output: json or csv"
+    ),
     url: str = typer.Option(
         default_url,
         help="URL of the MAST service API to connect to"
@@ -74,7 +80,7 @@ def references(
     """Get the list of references"""
     service = ReferencesService(APIConnector(url, None))
     res = service.list()
-    print_json(res, pretty)
+    print_output(res, format, pretty)
 
 #
 # Experiments
@@ -106,6 +112,10 @@ def experiments(
         None,
         help="ID of the reference to filter by"
     ),
+    format: str = typer.Option(
+        "json",
+        help="Format of the output: json or csv"
+    ),
     url: str = typer.Option(
         default_url,
         help="URL of the MAST service API to connect to"
@@ -124,8 +134,15 @@ def experiments(
     if filter:
         params = {"filter": json.dumps(filter)}
     res = service.list(params=params)
-    print_json(res, pretty)
+    print_output(res, format, pretty)
 
+
+def print_output(res, format, pretty):
+    """Print the output"""
+    if format == "csv":
+        pd.DataFrame(res).to_csv(sys.stdout, index=False, sep="\t", quotechar='"')
+    else:
+        print_json(res, pretty)
 
 def print_json(res, pretty):
     """Print the JSON response"""
@@ -140,7 +157,7 @@ def main() -> None:
     Used by the poetry entrypoint.
     """
 
-    basicConfig(level=DEBUG)
+    basicConfig(level=INFO)
     app()
 
 

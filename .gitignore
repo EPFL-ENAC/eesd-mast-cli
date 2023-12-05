@@ -1,3 +1,4 @@
 dist
 *xlsx
 .env
+__pycache__

@@ -10,19 +10,7 @@ import json
 
 from mast.core.io import APIConnector
 
-def do_upload(filename: str, key: str, url: str) -> None:
-    """Upload a file to the MAST service
-
-    Args:
-        filename: Path to the file to upload
-        key: API key to authenticate with the MAST service
-        url: URL of the MAST service API
-    """
-    # Check if the file exists
-    if not os.path.exists(filename):
-        raise FileNotFoundError(f"File not found: {filename}")
-    info(f"Upload {filename} to {url}")
-
+def read_xlsx(filename: str) -> pd.DataFrame:
     Database_summary = pd.read_excel(open(filename, "rb"), sheet_name="Summary")
 
     # Initialize an empty list to store the data
@@ -150,8 +138,27 @@ def do_upload(filename: str, key: str, url: str) -> None:
     full_reference = pd.merge(experiment[["reference_id"]], Database_references, left_index=True, right_on="experiment_id").drop("experiment_id", axis=1).drop_duplicates()
     reference = pd.merge(reference, full_reference, left_index=True, right_on="reference_id").drop("reference_id", axis=1)
 
+    return experiment, reference
+
+def do_upload(filename: str, key: str, url: str) -> None:
+    """Upload a file to the MAST service
+
+    Args:
+        filename: Path to the file to upload
+        key: API key to authenticate with the MAST service
+        url: URL of the MAST service API
+    """
+    # Check if the file exists
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"File not found: {filename}")
+    info(f"Upload {filename} to {url}")
+
+    # Read the Excel file
+    info("reading Excel file")
+    experiment, reference = read_xlsx(filename)
+    
     # Connect to the API
-    api = APIConnector(key, url)
+    api = APIConnector(url, key)
 
     ref_ids = {}
 
@@ -168,13 +175,15 @@ def do_upload(filename: str, key: str, url: str) -> None:
         except Exception as e:
             debug(f"<<< reference {index} not written: {e}")
     #debug(f"{ref_ids}")
-
-    # Write the DataFrame to the database
-    info("writing experiments")
+    
+    # Apply the reference IDs from the database
     experiment["reference_id"] = experiment["reference"].map(lambda x: int(ref_ids[x]) if x in ref_ids else None)
     experiment = experiment.drop("reference", axis=1)
+    
+    # Write the DataFrame to the database
+    info("writing experiments")
     for index, row in experiment.iterrows():
-        if isnan(row["reference_id"]):
+        if not row["reference_id"] or isnan(row["reference_id"]):
             debug(f">>> NOT writing experiment {index}: {row['reference_id']}")
             continue
         debug(f">>> writing experiment {index}")

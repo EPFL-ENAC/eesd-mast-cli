@@ -1,5 +1,7 @@
 import os
-from logging import debug, info
+from tempfile import TemporaryDirectory
+from logging import debug, info, warning
+
 import pandas as pd
 from numbers import Number
 import re
@@ -7,12 +9,49 @@ from math import isnan
 import numpy as np
 from tqdm import tqdm
 
+from openpyxl import load_workbook
+from openpyxl_image_loader import SheetImageLoader
+
 from mast.core.io import APIConnector
+from mast.services.files import FilesService
 from mast.services.references import ReferencesService
 from mast.services.experiments import ExperimentsService
 from mast.services.run_results import RunResultsService
 
-def read_xlsx(filename: str) -> pd.DataFrame:
+#
+# Excel cell values cleanup functions
+#
+
+def number_cleanup(x):
+    """Clean a number value"""
+    rval = x
+    if not isinstance(x, Number) or isnan(x):
+        rval = None
+    return rval
+
+def array_formatter(x):
+    """Format an array value: split string value when necessary, ensure singletons are in a list"""
+    if isinstance(x, Number) and isnan(x):
+        return None
+    if isinstance(x, str):
+        x = x.strip()
+        x = re.split(r"\n|/", x)
+    return x if isinstance(x, list) else [x]
+
+def yesno_cleanup(x):
+    """Clean a yes/no value to boolean"""
+    return x != None and x != "No"
+
+def string_cleanup(x):
+    """Clean a string value"""
+    return x if isinstance(x, str) else None
+
+#
+# Read Excel sheet functions
+#
+
+def read_experiments(filename: str) -> pd.DataFrame:
+    """Read experiments from Summary sheet"""
     info("Reading sheet (Summary)")
     Database_summary = pd.read_excel(open(filename, "rb"), sheet_name="Summary")
 
@@ -82,24 +121,10 @@ def read_xlsx(filename: str) -> pd.DataFrame:
     experiments[["corresponding_author_name", "corresponding_author_email"]] = experiments["corresponding_author_name"].str.rsplit("\n", n=1, expand=True)
     
     # Prepare array values
-    def array_formatter(x):
-        if isinstance(x, Number) and isnan(x):
-            return None
-        if isinstance(x, str):
-            x = x.strip()
-            x = re.split(r"\n|/", x)
-        return x if isinstance(x, list) else [x]
-    
     for col in ["applied_excitation_directions", "masonry_wall_thickness", "retrofitting_type", "material_characterizations", "material_characterization_refs", "associated_test_types", "experimental_results_reported", "crack_types_observed"]:
         experiments[col] = experiments[col].apply(array_formatter)
 
     # Clean number values
-    def number_cleanup(x):
-        rval = x
-        if not isinstance(x, Number) or isnan(x):
-            rval = None
-        return rval
-    
     for col in ["publication_year", "storeys_nb", "total_building_height", "masonry_compressive_strength", "wall_leaves_nb", "first_estimated_fundamental_period", "last_estimated_fundamental_period", "max_horizontal_pga", "max_estimated_dg"]:
         experiments[col] = experiments[col].apply(number_cleanup)
     # for some reason pandas changes None for NaN, so we need to change it back
@@ -109,46 +134,32 @@ def read_xlsx(filename: str) -> pd.DataFrame:
     experiments["link_to_open_measured_data"] = experiments["open_measured_data"].map(lambda x: x if x.startswith("http") else None)
     
     # Clean boolean values
-    def yesno_cleanup(x):
-        return x != None and x != "No"
-    
     for col in ["open_measured_data", "digitalized_data", "internal_walls", "retrofitted"]:
         experiments[col] = experiments[col].apply(yesno_cleanup)
 
     # Clean string values
-    def string_cleanup(x):
-        return x if isinstance(x, str) else None
-    
     for col in ["experimental_campaign_motivation"]:
         experiments[col] = experiments[col].apply(string_cleanup)
 
-    # References    
-    references = experiments[["reference", "publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"]].drop_duplicates().copy()
-    references["request_data_available"] = references["link_to_request_data"].map(lambda x: x if not x.startswith("http") else "Available on request")
-    references["link_to_request_data"] = references["link_to_request_data"].map(lambda x: x if x.startswith("http") else None)
-    references.index = np.arange(1, len(references)+1)
+    return experiments
 
-    # Experiments
-    experiments["reference_id"] = experiments["reference"].map(lambda x: references[references["reference"] == x].index[0])
-    experiments = experiments.drop(["publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"], axis=1)
-    experiments.index = np.arange(1, len(experiments)+1)
-
-    # Full references
+def read_references(filename: str) -> pd.DataFrame:
+    """Read references from References sheet"""
     info("Reading sheet (References)")
-    Database_references = pd.read_excel(open(filename, "rb"), sheet_name="References", usecols="A:C", header=1)
-    Database_references.drop("Excel sheet name", axis=1, inplace=True)
-    Database_references.rename(columns={"Building #": "experiment_id", "Reference": "full_reference"}, inplace=True)
-    full_reference = pd.merge(experiments[["reference_id"]], Database_references, left_index=True, right_on="experiment_id").drop("experiment_id", axis=1).drop_duplicates()
-    references = pd.merge(references, full_reference, left_index=True, right_on="reference_id").drop("reference_id", axis=1)
+    references = pd.read_excel(open(filename, "rb"), sheet_name="References", usecols="A:C", header=1)
+    references.drop("Excel sheet name", axis=1, inplace=True)
+    references.rename(columns={"Building #": "experiment_id", "Reference": "full_reference"}, inplace=True)
+    return references
 
-    # Run results
+def read_run_results(filename: str, experiment_ids) -> pd.DataFrame:
+    """Read run results from the per-experiment sheets"""
     def run_id_check(x):
         if isinstance(x, Number):
             return not isnan(x)
         return x != None and x.strip() != "-"# and x.strip() != "Initial" and x.strip() != "Final"
 
     run_results = []
-    for i in tqdm(experiments["id"], desc="Reading run results sheets", leave=False):
+    for i in tqdm(experiment_ids, desc="Reading run results from experiment sheets", leave=False):
         debug(f"reading sheet (B{i})")
         results = pd.read_excel(open(filename, "rb"), sheet_name=f"B{i}", usecols="F:U", header=2)
         results = results.loc[results["Run ID"].apply(run_id_check)]
@@ -177,16 +188,65 @@ def read_xlsx(filename: str) -> pd.DataFrame:
         # change NaN for None
         results = results.replace({np.nan:None})
         run_results.append(results)
+    
+    return pd.concat(run_results, ignore_index=True)
 
-    return experiments, references, pd.concat(run_results, ignore_index=True)
+def read_experiment_images(filename: str, experiment_ids) -> TemporaryDirectory:
+    """Read experiment images from the Summary sheet"""
+    temp_dir = TemporaryDirectory()
+    info(f"Reading images from experiment sheets into {temp_dir.name}")
+    wb = load_workbook(filename)
+    sheet = wb["Summary"]
+    image_loader = SheetImageLoader(sheet)
+        
+    row = 1
+    for i in tqdm(experiment_ids, desc="Reading images from experiment sheets", leave=False):
+        row += 1
+        cell = f"B{row}"
+        if image_loader.image_in(cell):
+            image = image_loader.get(cell)
+            #image.save(os.path.join("examples/images", f"B{i}.png"))
+            image.save(os.path.join(temp_dir.name, f"B{i}.png"))
+
+    return temp_dir
+
+
+def read_xlsx(filename: str) -> pd.DataFrame:
+    """Read experiments, references and run results from an Excel file"""
+    # Experiments
+    experiments = read_experiments(filename)
+    # Full references
+    Database_references = read_references(filename)
+
+    # Extract some reference fields from the experiments data frame
+    references = experiments[["reference", "publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"]].drop_duplicates().copy()
+    references["request_data_available"] = references["link_to_request_data"].map(lambda x: x if not x.startswith("http") else "Available on request")
+    references["link_to_request_data"] = references["link_to_request_data"].map(lambda x: x if x.startswith("http") else None)
+    references.index = np.arange(1, len(references)+1)
+    # Clean reference fields from experiments
+    experiments["reference_id"] = experiments["reference"].map(lambda x: references[references["reference"] == x].index[0])
+    experiments = experiments.drop(["publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"], axis=1)
+    experiments.index = np.arange(1, len(experiments)+1)
+
+    # Merge the references data frame with the full references data frame
+    full_reference = pd.merge(experiments[["reference_id"]], Database_references, left_index=True, right_on="experiment_id").drop("experiment_id", axis=1).drop_duplicates()
+    references = pd.merge(references, full_reference, left_index=True, right_on="reference_id").drop("reference_id", axis=1)
+
+    # Run results
+    run_results = read_run_results(filename, experiments["id"])
+
+    # Images
+    images_dir = read_experiment_images(filename, experiments["id"])
+    
+    return experiments, references, run_results, images_dir
+
 
 def do_upload(conn: APIConnector, filename: str) -> None:
     """Upload a file to the MAST service
 
     Args:
+        conn: API Connector instance to use
         filename: Path to the file to upload
-        key: API key to authenticate with the MAST service
-        url: URL of the MAST service API
     """
     # Check if the file exists
     if not os.path.exists(filename):
@@ -194,12 +254,13 @@ def do_upload(conn: APIConnector, filename: str) -> None:
     info(f"Upload of {filename} to {conn.api_url}")
 
     # Read the Excel file
-    experiments, references, results = read_xlsx(filename)
+    experiments, references, results, images_dir = read_xlsx(filename)
     
     # Use services
     ref_service = ReferencesService(conn)
     exp_service = ExperimentsService(conn)
     res_service = RunResultsService(conn)
+    fs_service = FilesService(conn)
     # map reference short name to IDs from the database
     ref_ids = {}
     # map experiment IDs from the Excel file to IDs from the database
@@ -214,7 +275,7 @@ def do_upload(conn: APIConnector, filename: str) -> None:
             ref_ids[row["reference"]] = res["id"]
             debug(f"<<< reference {index} written with ID {res['id']}")
         except Exception as e:
-            debug(f"<<< reference {index} not written: {e}")
+            warning(f"<<< reference {index} not written: {e}")
     
     # Apply the reference IDs from the database
     experiments["reference_id"] = experiments["reference"].map(lambda x: int(ref_ids[x]) if x in ref_ids else None)
@@ -233,7 +294,7 @@ def do_upload(conn: APIConnector, filename: str) -> None:
             exp_ids[row["id"]] = res["id"]
             debug(f"<<< experiment {index} written with ID {res['id']}")
         except Exception as e:
-            debug(f"<<< experiment {index} not written: {e}")
+            warning(f"<<< experiment {index} not written: {e}")
 
     # Apply the experiment IDs to the results
     results["experiment_id"] = results["experiment_id"].map(lambda x: int(exp_ids[x]) if x in exp_ids else None)
@@ -249,4 +310,13 @@ def do_upload(conn: APIConnector, filename: str) -> None:
             res = res_service.create(payload)
             debug(f"<<< run result {index} written")
         except Exception as e:
-            debug(f"<<< run result {index} not written: {e}")
+            warning(f"<<< run result {index} not written: {e}")
+    
+    # Upload images
+    info(f"Uploading images from {images_dir.name}")
+    for img_filename in tqdm(os.listdir(images_dir.name), desc="Uploading images", leave=False):
+        try:
+            res = fs_service.upload(os.path.join(images_dir.name, img_filename))
+            info(f"<<< image {img_filename} uploaded with response {res}")
+        except Exception as e:
+            warning(f"<<< image {img_filename} not uploaded: {e}")

@@ -18,3 +18,13 @@ class ReferencesService:
 
     def list(self, params=None):
         return self.conn.get("/references", params=params)
+    
+    def createOrUpdate(self, data):
+        """Create or update a reference, using its reference field as the key"""
+        try:
+            res = self.get(data["reference"])
+            return self.update(res["id"], data)
+        except Exception as e:
+            return self.create(data)
+        
+        

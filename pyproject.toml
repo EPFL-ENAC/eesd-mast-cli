@@ -6,6 +6,8 @@ license = "GPL-3.0-or-later"
 authors = ["ymarcon <yannick.marcon@epfl.ch>"]
 readme = "README.md"
 
+exclude = ["examples"]
+
 [tool.poetry.scripts]
 mast = 'mast.app:main'
 
@@ -18,6 +20,7 @@ rich = "^13.7.0"
 tqdm = "^4.66.1"
 openpyxl = "^3.1.2"
 requests = "^2.31.0"
+openpyxl-image-loader = "^1.0.5"
 
 [build-system]
 requires = ["poetry-core"]

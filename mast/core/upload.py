@@ -27,10 +27,10 @@ def read_xlsx(filename: str) -> pd.DataFrame:
         data_summary.append(row)
         
     # Convert the collected data to a new DataFrame
-    experiment = pd.DataFrame(data_summary)
+    experiments = pd.DataFrame(data_summary)
 
     # Rename the columns
-    experiment.rename(columns = {
+    experiments.rename(columns = {
         "Building #": "id",
         "Scheme": "scheme",
         "Reference": "reference",
@@ -75,11 +75,11 @@ def read_xlsx(filename: str) -> pd.DataFrame:
     }, inplace=True)
     
     # Drop some columns
-    del experiment["scheme"] # do not handle scheme image yet
-    del experiment["run_results_nb"] # dynamically calculated
+    del experiments["scheme"] # do not handle scheme image yet
+    del experiments["run_results_nb"] # dynamically calculated
 
     # Split author string
-    experiment[["corresponding_author_name", "corresponding_author_email"]] = experiment["corresponding_author_name"].str.rsplit("\n", n=1, expand=True)
+    experiments[["corresponding_author_name", "corresponding_author_email"]] = experiments["corresponding_author_name"].str.rsplit("\n", n=1, expand=True)
     
     # Prepare array values
     def array_formatter(x):
@@ -91,7 +91,7 @@ def read_xlsx(filename: str) -> pd.DataFrame:
         return x if isinstance(x, list) else [x]
     
     for col in ["applied_excitation_directions", "masonry_wall_thickness", "retrofitting_type", "material_characterizations", "material_characterization_refs", "associated_test_types", "experimental_results_reported", "crack_types_observed"]:
-        experiment[col] = experiment[col].apply(array_formatter)
+        experiments[col] = experiments[col].apply(array_formatter)
 
     # Clean number values
     def number_cleanup(x):
@@ -101,45 +101,45 @@ def read_xlsx(filename: str) -> pd.DataFrame:
         return rval
     
     for col in ["publication_year", "storeys_nb", "total_building_height", "masonry_compressive_strength", "wall_leaves_nb", "first_estimated_fundamental_period", "last_estimated_fundamental_period", "max_horizontal_pga", "max_estimated_dg"]:
-        experiment[col] = experiment[col].apply(number_cleanup)
+        experiments[col] = experiments[col].apply(number_cleanup)
     # for some reason pandas changes None for NaN, so we need to change it back
-    experiment = experiment.replace({np.nan:None})
+    experiments = experiments.replace({np.nan:None})
     
     # Split open measures data field
-    experiment["link_to_open_measured_data"] = experiment["open_measured_data"].map(lambda x: x if x.startswith("http") else None)
+    experiments["link_to_open_measured_data"] = experiments["open_measured_data"].map(lambda x: x if x.startswith("http") else None)
     
     # Clean boolean values
     def yesno_cleanup(x):
         return x != None and x != "No"
     
     for col in ["open_measured_data", "digitalized_data", "internal_walls", "retrofitted"]:
-        experiment[col] = experiment[col].apply(yesno_cleanup)
+        experiments[col] = experiments[col].apply(yesno_cleanup)
 
     # Clean string values
     def string_cleanup(x):
         return x if isinstance(x, str) else None
     
     for col in ["experimental_campaign_motivation"]:
-        experiment[col] = experiment[col].apply(string_cleanup)
+        experiments[col] = experiments[col].apply(string_cleanup)
 
     # References    
-    reference = experiment[["reference", "publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"]].drop_duplicates().copy()
-    reference["request_data_available"] = reference["link_to_request_data"].map(lambda x: x if not x.startswith("http") else "Available on request")
-    reference["link_to_request_data"] = reference["link_to_request_data"].map(lambda x: x if x.startswith("http") else None)
-    reference.index = np.arange(1, len(reference)+1)
+    references = experiments[["reference", "publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"]].drop_duplicates().copy()
+    references["request_data_available"] = references["link_to_request_data"].map(lambda x: x if not x.startswith("http") else "Available on request")
+    references["link_to_request_data"] = references["link_to_request_data"].map(lambda x: x if x.startswith("http") else None)
+    references.index = np.arange(1, len(references)+1)
 
     # Experiments
-    experiment["reference_id"] = experiment["reference"].map(lambda x: reference[reference["reference"] == x].index[0])
-    experiment = experiment.drop(["publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"], axis=1)
-    experiment.index = np.arange(1, len(experiment)+1)
+    experiments["reference_id"] = experiments["reference"].map(lambda x: references[references["reference"] == x].index[0])
+    experiments = experiments.drop(["publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"], axis=1)
+    experiments.index = np.arange(1, len(experiments)+1)
 
     # Full references
     info("Reading sheet (References)")
     Database_references = pd.read_excel(open(filename, "rb"), sheet_name="References", usecols="A:C", header=1)
     Database_references.drop("Excel sheet name", axis=1, inplace=True)
     Database_references.rename(columns={"Building #": "experiment_id", "Reference": "full_reference"}, inplace=True)
-    full_reference = pd.merge(experiment[["reference_id"]], Database_references, left_index=True, right_on="experiment_id").drop("experiment_id", axis=1).drop_duplicates()
-    reference = pd.merge(reference, full_reference, left_index=True, right_on="reference_id").drop("reference_id", axis=1)
+    full_reference = pd.merge(experiments[["reference_id"]], Database_references, left_index=True, right_on="experiment_id").drop("experiment_id", axis=1).drop_duplicates()
+    references = pd.merge(references, full_reference, left_index=True, right_on="reference_id").drop("reference_id", axis=1)
 
     # Run results
     def run_id_check(x):
@@ -148,7 +148,7 @@ def read_xlsx(filename: str) -> pd.DataFrame:
         return x != None and x.strip() != "-"# and x.strip() != "Initial" and x.strip() != "Final"
 
     run_results = []
-    for i in tqdm(experiment["id"], desc="Reading run results sheets", leave=False):
+    for i in tqdm(experiments["id"], desc="Reading run results sheets", leave=False):
         debug(f"reading sheet (B{i})")
         results = pd.read_excel(open(filename, "rb"), sheet_name=f"B{i}", usecols="F:U", header=2)
         results = results.loc[results["Run ID"].apply(run_id_check)]
@@ -178,7 +178,7 @@ def read_xlsx(filename: str) -> pd.DataFrame:
         results = results.replace({np.nan:None})
         run_results.append(results)
 
-    return experiment, reference, pd.concat(run_results, ignore_index=True)
+    return experiments, references, pd.concat(run_results, ignore_index=True)
 
 def do_upload(conn: APIConnector, filename: str) -> None:
     """Upload a file to the MAST service
@@ -194,43 +194,34 @@ def do_upload(conn: APIConnector, filename: str) -> None:
     info(f"Upload of {filename} to {conn.api_url}")
 
     # Read the Excel file
-    experiment, reference, results = read_xlsx(filename)
+    experiments, references, results = read_xlsx(filename)
     
     # Use services
     ref_service = ReferencesService(conn)
     exp_service = ExperimentsService(conn)
     res_service = RunResultsService(conn)
+    # map reference short name to IDs from the database
     ref_ids = {}
+    # map experiment IDs from the Excel file to IDs from the database
     exp_ids = {}
 
     # Write the DataFrame to the database
-    for index, row in tqdm(reference.iterrows(), total=reference.shape[0], desc="Uploading references", leave=False):
+    for index, row in tqdm(references.iterrows(), total=references.shape[0], desc="Uploading references", leave=False):
         debug(f">>> checking reference {index}")
-        id = None
         try:
-            res = ref_service.get(row["reference"])
-            id = res["id"]
-        except Exception as e:
-            debug(f"<<< reference {index} not found: {e}")
-        try:
-            res = None
-            if not id:
-                debug(f">>> adding reference {index}")
-                res = ref_service.create(row.to_dict())
-            else:
-                debug(f">>> updating reference {index}")
-                res = ref_service.update(id, row.to_dict())
+            debug(f">>> adding or updating reference {index}")
+            res = ref_service.createOrUpdate(row.to_dict())
             ref_ids[row["reference"]] = res["id"]
             debug(f"<<< reference {index} written with ID {res['id']}")
         except Exception as e:
             debug(f"<<< reference {index} not written: {e}")
     
     # Apply the reference IDs from the database
-    experiment["reference_id"] = experiment["reference"].map(lambda x: int(ref_ids[x]) if x in ref_ids else None)
-    experiment = experiment.drop("reference", axis=1)
+    experiments["reference_id"] = experiments["reference"].map(lambda x: int(ref_ids[x]) if x in ref_ids else None)
+    experiments = experiments.drop("reference", axis=1)
     
     # Write the DataFrame to the database
-    for index, row in tqdm(experiment.iterrows(), total=experiment.shape[0], desc="Uploading experiments", leave=False):
+    for index, row in tqdm(experiments.iterrows(), total=experiments.shape[0], desc="Uploading experiments", leave=False):
         if not row["reference_id"] or isnan(row["reference_id"]):
             debug(f">>> NOT writing experiment {index}: {row['reference_id']}")
             continue

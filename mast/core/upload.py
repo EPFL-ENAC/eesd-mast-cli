@@ -206,7 +206,7 @@ def read_experiment_images(filename: str, experiment_ids) -> TemporaryDirectory:
         if image_loader.image_in(cell):
             image = image_loader.get(cell)
             #image.save(os.path.join("examples/images", f"B{i}.png"))
-            image.save(os.path.join(temp_dir.name, f"B{i}.png"))
+            image.save(os.path.join(temp_dir.name, f"{i}.png"))
 
     return temp_dir
 
@@ -265,8 +265,22 @@ def do_upload(conn: APIConnector, filename: str) -> None:
     ref_ids = {}
     # map experiment IDs from the Excel file to IDs from the database
     exp_ids = {}
+    # map experiment IDs from the Excel file to stored file objects
+    exp_files = {}
 
-    # Write the DataFrame to the database
+    # Upload experiment images
+    info(f"Uploading images from {images_dir.name}")
+    for img_filename in tqdm(os.listdir(images_dir.name), desc="Uploading images", leave=False):
+        try:
+            # image file is named by the experiment ID in the Excel file
+            res = fs_service.upload(os.path.join(images_dir.name, img_filename))
+            exp_id = img_filename.split(".")[0]
+            exp_files[exp_id] = res["files"][0]
+            debug(f"<<< image {img_filename} uploaded with response {res}")
+        except Exception as e:
+            warning(f"<<< image {img_filename} not uploaded: {e}")
+
+    # Write the references to the database
     for index, row in tqdm(references.iterrows(), total=references.shape[0], desc="Uploading references", leave=False):
         debug(f">>> checking reference {index}")
         try:
@@ -277,11 +291,14 @@ def do_upload(conn: APIConnector, filename: str) -> None:
         except Exception as e:
             warning(f"<<< reference {index} not written: {e}")
     
-    # Apply the reference IDs from the database
+    # Apply the reference IDs from the database to the experiments
     experiments["reference_id"] = experiments["reference"].map(lambda x: int(ref_ids[x]) if x in ref_ids else None)
     experiments = experiments.drop("reference", axis=1)
-    
-    # Write the DataFrame to the database
+
+    # Apply the file IDs from the database to the experiments
+    experiments["scheme"] = experiments["id"].map(lambda x: exp_files[str(x)] if str(x) in exp_files else None)
+
+    # Write the experiments to the database
     for index, row in tqdm(experiments.iterrows(), total=experiments.shape[0], desc="Uploading experiments", leave=False):
         if not row["reference_id"] or isnan(row["reference_id"]):
             debug(f">>> NOT writing experiment {index}: {row['reference_id']}")
@@ -312,11 +329,3 @@ def do_upload(conn: APIConnector, filename: str) -> None:
         except Exception as e:
             warning(f"<<< run result {index} not written: {e}")
     
-    # Upload images
-    info(f"Uploading images from {images_dir.name}")
-    for img_filename in tqdm(os.listdir(images_dir.name), desc="Uploading images", leave=False):
-        try:
-            res = fs_service.upload(os.path.join(images_dir.name, img_filename))
-            info(f"<<< image {img_filename} uploaded with response {res}")
-        except Exception as e:
-            warning(f"<<< image {img_filename} not uploaded: {e}")

@@ -15,7 +15,7 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False,
 )
 
-default_url = "http://127.0.0.1:8000"
+default_url = "https://mast-dev.epfl.ch/api"
 
 @app.command()
 def upload(

@@ -1,3 +1,5 @@
 dist
 *xlsx
 .env
+__pycache__
+*csv

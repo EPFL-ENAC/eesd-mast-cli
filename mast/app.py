@@ -1,5 +1,4 @@
 import typer
-from typing_extensions import Annotated
 from logging import DEBUG, INFO, NOTSET, basicConfig
 from mast.core.upload import do_upload
 from mast.services.references import ReferencesService

@@ -63,6 +63,35 @@ def reference(
     print_json(res, pretty)
 
 @app.command()
+def rm_reference(
+    id: str = typer.Argument(
+        ...,
+        help="ID of the reference to remove"
+    ),
+    force: bool = typer.Option(
+        False,
+        help="Force the deletion, otherwise ask for confirmation",
+        prompt="Are you sure you want to delete the reference?"
+    ),
+    recursive: bool = typer.Option(
+        False,
+        help="Remove the reference and all associated experiments"
+    ),
+    key: str = typer.Option(
+        ...,
+        help="API key to authenticate with the MAST service"
+    ),
+    url: str = typer.Option(
+        default_url,
+        help="URL of the MAST service API to connect to"
+    )
+    ) -> None:
+    """Remove a reference"""
+    if force:
+        service = ReferencesService(APIConnector(url, key))
+        service.delete(id, recursive)
+
+@app.command()
 def references(
     format: str = typer.Option(
         "json",
@@ -106,6 +135,35 @@ def experiment(
     res = service.get(id)
     print_json(res, pretty)
 
+@app.command()
+def rm_experiment(
+    id: str = typer.Argument(
+        ...,
+        help="ID of the experiment to remove"
+    ),
+    force: bool = typer.Option(
+        False,
+        help="Force the deletion, otherwise ask for confirmation",
+        prompt="Are you sure you want to delete the experiment?"
+    ),
+    recursive: bool = typer.Option(
+        False,
+        help="Remove the experiment and all associated run results"
+    ),
+    key: str = typer.Option(
+        ...,
+        help="API key to authenticate with the MAST service"
+    ),
+    url: str = typer.Option(
+        default_url,
+        help="URL of the MAST service API to connect to"
+    )
+    ) -> None:
+    """Remove an experiment"""
+    if force:
+        service = ExperimentsService(APIConnector(url, key))
+        service.delete(id, recursive)
+    
 @app.command()
 def experiments(
     reference: int = typer.Option(

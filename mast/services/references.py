@@ -13,8 +13,8 @@ class ReferencesService:
     def update(self, id, data):
         return self.conn.put(f"/references/{id}", data=data)
 
-    def delete(self, id):
-        return self.conn.delete(f"/references/{id}")
+    def delete(self, id, recursive: bool = False):
+        return self.conn.delete(f"/references/{id}?recursive={recursive}")
 
     def list(self, params=None):
         return self.conn.get("/references", params=params)

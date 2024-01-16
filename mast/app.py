@@ -1,12 +1,14 @@
 import typer
-from logging import DEBUG, INFO, NOTSET, basicConfig
-from mast.core.upload import do_upload
-from mast.services.references import ReferencesService
-from mast.services.experiments import ExperimentsService
-from mast.core.io import APIConnector
 import json
 import pandas as pd
 import sys
+import os
+from logging import INFO, basicConfig, info, warning, error
+from mast.core.upload import do_upload
+from mast.core.repo import do_generate_repo, do_validate_repo, do_upload_repo
+from mast.services.references import ReferencesService
+from mast.services.experiments import ExperimentsService
+from mast.core.io import APIConnector
 
 # Initialise the Typer class
 app = typer.Typer(
@@ -16,6 +18,10 @@ app = typer.Typer(
 )
 
 default_url = "https://mast-dev.epfl.ch/api"
+
+#
+# Data upload
+#
 
 @app.command()
 def upload(
@@ -32,11 +38,120 @@ def upload(
         help="URL of the MAST service API to connect to"
     )
     ) -> None:
-    """Import a Excel file with metadata to the database
+    """Import an Excel file with metadata to the database.
 
-    The Excel file must have the following columns: x, y, z
+    The Excel file must have the following columns: x, y, z.
     """
     do_upload(APIConnector(url, key), filename)
+
+@app.command()
+def generate_repo(
+    folder: str = typer.Argument(
+        ...,
+        help="Path to the folder where experiment's file repository are to be generated"
+    ),
+    id: str = typer.Option(
+        None,
+        help="ID of the experiment to retrieve to prepopulate the experiment files repository"
+    ),
+    url: str = typer.Option(
+        default_url, 
+        help="URL of the MAST service API to connect to"
+    )
+    ) -> None:
+    """Generates the experiment's rfile epository structure.
+
+    If the experiment ID is provided, the experiment's metadata will be used to generate the README.md file
+    and folders will be filled in with the empty expected run result files.
+    """
+    try:
+        output = do_generate_repo(APIConnector(url, None), folder, id)
+        info(f"Folder generated: {output}")
+    except Exception as e:
+        try:
+            msg = json.loads(str(e))
+            if "detail" in msg:
+                error(msg["detail"])
+            else:
+                error(e)
+        except:
+            error(e)
+
+@app.command()
+def validate_repo(
+    folder: str = typer.Argument(
+        ...,
+        help="Path to the folder where experiment's file repository are to be validated"
+    ),
+    id: str = typer.Option(
+        None,
+        help="ID of the experiment to retrieve to validate the experiment files repository"
+    ),
+    url: str = typer.Option(
+        default_url,
+        help="URL of the MAST service API to connect to"
+    )
+    ) -> None:
+    """Validates the experiment's file repository structure.
+    """
+    warnings, errors = do_validate_repo(APIConnector(url, None), folder, id)
+    if warnings:
+        for warn in warnings:
+            warning(warn)
+    if errors:
+        for err in errors:
+            error(err)
+
+@app.command()
+def upload_repo(
+    file: str = typer.Argument(
+        ...,
+        help="Path to the file where experiment's files are located, can be a folder or a zip file"
+    ),
+    id: str = typer.Option(
+        ...,
+        help="ID of the experiment to link with"
+    ),
+    force: bool = typer.Option(
+        False,
+        help="Force the upload despite warnings, otherwise ask for confirmation"
+    ),
+    key: str = typer.Option(
+        ...,
+        help="API key to authenticate with the MAST service"
+    ),
+    url: str = typer.Option(
+        default_url, 
+        help="URL of the MAST service API to connect to"
+    ),
+    pretty: bool = typer.Option(
+        False,
+        help="Pretty-print the JSON output"
+    )
+    ) -> None:
+    """Upload the experiment's file repository.
+    """
+    
+    in_file = os.path.expanduser(file)
+    if not os.path.isfile(in_file) or not in_file.endswith(".zip"):
+        error("Not a zip file, aborting upload")
+        return
+
+    # warnings, errors = do_validate_repo(APIConnector(url, None), folder, id)
+    # if errors:
+    #     for err in errors:
+    #         error(err)
+    #     info("Aborting upload")
+    #     return
+
+    # if warnings:
+    #     for warn in warnings:
+    #         warning(warn)
+    #     if not force:
+    #         typer.confirm("Do you want to continue?", abort=True)
+
+    experiment = do_upload_repo(APIConnector(url, key), in_file, id)
+    print_json(experiment, pretty)
 
 #
 # References

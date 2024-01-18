@@ -1,10 +1,14 @@
 import os
 import json
+import zipfile
+import tempfile
+import shutil
+import typer
 from time import strftime
 from pathlib import Path
+from logging import info, warning, error
 
 from mast.core.io import APIConnector
-from mast.services.files import FilesService
 from mast.services.experiments import ExperimentsService
 from mast.services.run_results import RunResultsService
 
@@ -44,6 +48,38 @@ def list_files_recursively(folder_path):
         if file_path.is_file():
             paths.append(str(file_path))
     return paths
+
+def zip_to_temp_file(folder_path):
+    # Create a temp file
+    temp_file = tempfile.mkdtemp(".zip")
+    
+    with zipfile.ZipFile(temp_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for foldername, subfolders, filenames in os.walk(folder_path):
+            for filename in filenames:
+                file_path = os.path.join(foldername, filename)
+                arcname = os.path.relpath(file_path, folder_path)
+                zip_file.write(file_path, arcname)
+    
+    return temp_file
+
+def unzip_to_temp_directory(zip_file_path):
+    # Create a temporary directory
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+        # Open the ZIP file
+        with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
+            # Extract all contents to the temporary directory
+            zip_ref.extractall(temp_dir)
+
+        # Return the path to the temporary directory
+        return temp_dir
+
+    except Exception as e:
+        print(f"Error during unzip: {e}")
+        # Clean up on error
+        shutil.rmtree(temp_dir)
+        raise
 
 def do_generate_repo(conn: APIConnector, folder: str, id: str = None):
   """Generates the experiment's repository structure"""
@@ -98,10 +134,21 @@ def do_generate_repo(conn: APIConnector, folder: str, id: str = None):
   return experiment_folder
 
 
-def do_validate_repo(conn: APIConnector, folder: str, id: str = None):
+def do_validate_repo(conn: APIConnector, folder_or_zip: str, id: str = None):
   warnings = []
   errors = []
-  experiment_folder = os.path.expanduser(folder)
+  experiment_folder = os.path.expanduser(folder_or_zip)
+  
+  if os.path.isfile(folder_or_zip):
+    if folder_or_zip.endswith(".zip"):
+      experiment_folder = unzip_to_temp_directory(folder_or_zip)
+      dirs = [f.path for f in os.scandir(experiment_folder) if f.is_dir()]
+      if len(dirs) == 1:
+          experiment_folder = dirs[0]
+    else:
+      errors.append(f"Experiment repository must be either a folder or a zip file")
+      return warnings, errors
+  
   experiment = None
   run_ids = []
   if id:
@@ -115,60 +162,87 @@ def do_validate_repo(conn: APIConnector, folder: str, id: str = None):
 
   md_folder = get_3d_model_folder(experiment_folder)
   if os.path.exists(md_folder):
-    if not os.path.exists(os.path.join(md_folder, "main.vtk")):
-      errors.append(f"'3D model' folder exists but does not contain the main.vtk file")
+    vtks = [f.path for f in os.scandir(md_folder) if f.is_file() and (f.path.endswith(".vtk") or f.path.endswith(".vtp"))]
+    if not vtks:
+      warnings.append(f"Missing at least one .vtk or .vtp file: '3D model'")
   else:
-    warnings.append(f"'3D model' folder does not exist")
+    warnings.append(f"Missing folder: '3D model'")
   
   pdge_folder = get_period_dg_folder(experiment_folder)
   if os.path.exists(pdge_folder):
-    if not os.path.exists(os.path.join(pdge_folder, "Period_evolution.png")):
-      errors.append(f"'Period and DG evolution' folder exists but does not contain the Period_evolution.png file")
-    if not os.path.exists(os.path.join(pdge_folder, "DG_evolution.png")):
-      errors.append(f"'Period and DG evolution' folder exists but does not contain the DG_evolution.png file")
+    pngs = [f.path for f in os.scandir(pdge_folder) if f.is_file() and f.path.endswith(".png")]
+    if not pngs:
+      warnings.append(f"Missing at least one .png file: 'Period and DG evolution'")
   else:
-    warnings.append(f"'Period and DG evolution' folder does not exist")
+    warnings.append(f"Missing folder: 'Period and DG evolution'")
   
   cm_folder = get_crack_maps_folder(experiment_folder)
   if os.path.exists(cm_folder):
     for run_id in run_ids:
       if not os.path.exists(os.path.join(cm_folder, f"{run_id}.png")):
-        errors.append(f"'Crack maps' folder exists but does not contain the {run_id}.png file")
+        warnings.append(f"Missing file: 'Crack maps/{run_id}.png'")
   else:
-    warnings.append(f"'Crack maps' folder does not exist")
+    warnings.append(f"Missing folder: 'Crack maps'")
   
   gfdc_folder = get_global_force_displacement_curve_folder(experiment_folder)
   if os.path.exists(gfdc_folder):
     for run_id in run_ids:
       if not os.path.exists(os.path.join(gfdc_folder, f"{run_id}.txt")):
-        errors.append(f"'Global force-displacement curve' folder exists but does not contain the {run_id}.txt file")
+        warnings.append(f"Missing file: 'Global force-displacement curve/{run_id}.txt'")
   else:
-    warnings.append(f"'Global force-displacement curve' folder does not exist")  
+    warnings.append(f"Missing folder: 'Global force-displacement curve'")  
 
   sta_folder = get_shake_table_accelerations_folder(experiment_folder)
   if os.path.exists(sta_folder):
     for run_id in run_ids:
       if not os.path.exists(os.path.join(sta_folder, f"{run_id}.txt")):
-        errors.append(f"'Shake-table accelerations folder' exists but does not contain the {run_id}.txt file")
+        warnings.append(f"Missing file: 'Shake-table accelerations folder/{run_id}.txt'")
   else:
-    warnings.append(f"'Shake-table accelerations' folder does not exist")
+    warnings.append(f"Missing folder: 'Shake-table accelerations'")
 
   tdh_folder = get_top_displacement_histories_folder(experiment_folder)
   if os.path.exists(tdh_folder):
     for run_id in run_ids:
       if not os.path.exists(os.path.join(tdh_folder, f"{run_id}.txt")):
-        errors.append(f"'Top displacement histories' folder exists but does not contain the {run_id}.txt file")
+        warnings.append(f"Missing file: 'Top displacement histories/{run_id}.txt'")
   else:
-    warnings.append(f"'Top displacement histories' folder does not exist")
+    warnings.append(f"Missing folder: 'Top displacement histories'")
 
   rdm_path = os.path.join(experiment_folder, "README.md")
   if not os.path.exists(rdm_path):
     warnings.append(f"README.md file does not exist")
 
+  if folder_or_zip.endswith(".zip"):
+    # remove temp folder
+    shutil.rmtree(experiment_folder)
+
   return warnings, errors
 
+def do_upload_repo(conn: APIConnector, file: str, id: str = None, force: bool = False):
+    in_file = os.path.expanduser(file)
+    is_temp = False
+    if not os.path.isfile(in_file):
+      # make a zip file
+      is_temp = True
+      in_file = zip_to_temp_file(in_file)
+    elif not in_file.endswith(".zip"):
+      error("Not a zip file, aborting upload")
+      return
 
-def do_upload_repo(conn: APIConnector, zipfile: str, id: str = None):
-  experiment = ExperimentsService(conn).get(id)
-  
-  return FilesService(conn).upload(zipfile, prefix=f"/experiments/{id}")
+    warnings, errors = do_validate_repo(conn, os.path.expanduser(file), id)
+    if errors:
+        for err in errors:
+            error(err)
+        info("Aborting upload")
+        return
+
+    if warnings:
+        for warn in warnings:
+            warning(warn)
+        if not force:
+            typer.confirm("Do you want to continue?", abort=True)
+
+    res = ExperimentsService(conn).upload_files(id, in_file)
+    if is_temp:
+      os.remove(in_file)
+    return res

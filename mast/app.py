@@ -2,7 +2,6 @@ import typer
 import json
 import pandas as pd
 import sys
-import os
 from logging import INFO, basicConfig, info, warning, error
 from mast.core.upload import do_upload
 from mast.core.repo import do_generate_repo, do_validate_repo, do_upload_repo
@@ -79,9 +78,9 @@ def generate_repo(
 
 @app.command()
 def validate_repo(
-    folder: str = typer.Argument(
+    file: str = typer.Argument(
         ...,
-        help="Path to the folder where experiment's file repository are to be validated"
+        help="Path to the file where experiment's files are located, can be a folder or a zip file"
     ),
     id: str = typer.Option(
         None,
@@ -94,7 +93,7 @@ def validate_repo(
     ) -> None:
     """Validates the experiment's file repository structure.
     """
-    warnings, errors = do_validate_repo(APIConnector(url, None), folder, id)
+    warnings, errors = do_validate_repo(APIConnector(url, None), file, id)
     if warnings:
         for warn in warnings:
             warning(warn)
@@ -131,28 +130,34 @@ def upload_repo(
     ) -> None:
     """Upload the experiment's file repository.
     """
-    
-    in_file = os.path.expanduser(file)
-    if not os.path.isfile(in_file) or not in_file.endswith(".zip"):
-        error("Not a zip file, aborting upload")
-        return
-
-    # warnings, errors = do_validate_repo(APIConnector(url, None), folder, id)
-    # if errors:
-    #     for err in errors:
-    #         error(err)
-    #     info("Aborting upload")
-    #     return
-
-    # if warnings:
-    #     for warn in warnings:
-    #         warning(warn)
-    #     if not force:
-    #         typer.confirm("Do you want to continue?", abort=True)
-
-    experiment = do_upload_repo(APIConnector(url, key), in_file, id)
+    experiment = do_upload_repo(APIConnector(url, key), file, id, force)
     print_json(experiment, pretty)
 
+@app.command()
+def rm_repo(
+    id: str = typer.Option(
+        ...,
+        help="ID of the experiment which files are to deleted"
+    ),
+    force: bool = typer.Option(
+        False,
+        help="Force the deletion, otherwise ask for confirmation",
+        prompt="Are you sure you want to delete the experiment's files?"
+    ),
+    key: str = typer.Option(
+        ...,
+        help="API key to authenticate with the MAST service"
+    ),
+    url: str = typer.Option(
+        default_url, 
+        help="URL of the MAST service API to connect to"
+    )
+    ) -> None:
+    """Delete the experiment's file repository.
+    """
+    if force:
+        ExperimentsService(APIConnector(url, key)).delete_files(id)
+    
 #
 # References
 #

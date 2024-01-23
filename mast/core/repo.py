@@ -51,7 +51,7 @@ def list_files_recursively(folder_path):
 
 def zip_to_temp_file(folder_path):
     # Create a temp file
-    temp_file = tempfile.mkdtemp(".zip")
+    temp_file = tempfile.mktemp(".zip")
     
     with zipfile.ZipFile(temp_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for foldername, subfolders, filenames in os.walk(folder_path):

@@ -134,10 +134,29 @@ def upload_repo(
     print_json(experiment, pretty)
 
 @app.command()
-def rm_repo(
-    id: str = typer.Option(
+def download_repo(
+    id: str = typer.Argument(
         ...,
-        help="ID of the experiment which files are to deleted"
+        help="ID of the experiment which files are to be downloaded"
+    ),
+    file: str = typer.Option(
+        ...,
+        help="Path to the local zip file where experiment's files are to be written"
+    ),
+    url: str = typer.Option(
+        default_url, 
+        help="URL of the MAST service API to connect to"
+    )
+    ) -> None:
+    """Delete the experiment's file repository.
+    """
+    ExperimentsService(APIConnector(url, None)).get_files(id, file)
+
+@app.command()
+def rm_repo(
+    id: str = typer.Argument(
+        ...,
+        help="ID of the experiment which files are to be deleted"
     ),
     force: bool = typer.Option(
         False,

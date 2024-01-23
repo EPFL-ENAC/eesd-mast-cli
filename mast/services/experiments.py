@@ -16,7 +16,10 @@ class ExperimentsService:
 
     def upload_files(self, id, zipfile: str):
         return FilesService(self.conn).upload(zipfile, prefix=f"/experiments/{id}")
-
+    
+    def get_files(self, id, file: str):
+        return self.conn.download(f"/experiments/{id}/files", file)
+    
     def delete_files(self, id):
         return self.conn.delete(f"/experiments/{id}/files")
     

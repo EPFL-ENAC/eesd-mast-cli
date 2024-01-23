@@ -65,7 +65,7 @@ To validate an existing experiment data files repository, use the command:
 mast validate-repo --help
 ```
 
-To upload an experiment data files local folder, use the command:
+To upload an experiment data files local folder or zip archive, use the command:
 
 ```
 mast upload-repo --help
@@ -77,6 +77,11 @@ To download an experiment data files repository into a local folder, use the com
 mast download-repo --help
 ```
 
+To remove the experiment data files, use the command:
+
+```
+mast rm-repo --help
+```
 
 ## Development
 

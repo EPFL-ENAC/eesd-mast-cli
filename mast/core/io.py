@@ -1,5 +1,6 @@
 import requests
 import json
+import sys
 
 class APIConnector:
 
@@ -22,7 +23,20 @@ class APIConnector:
             return response.json()
         else:
             raise Exception(response.text)
-
+    
+    def download(self, endpoint: str, path: str):
+        url = self._url(endpoint)
+        headers = self._headers()
+        response = requests.request("GET", url, headers=headers)
+        if response.status_code == 200:
+            if response.headers["content-type"] == "application/json":
+                return response.json()
+            else:
+                with open(path, 'wb') as file:
+                    file.write(response.content)
+        else:
+            raise Exception(response.text)
+        
     def put(self, endpoint, data=None):
         return self._request("PUT", endpoint, data=data)
 
@@ -50,6 +64,9 @@ class APIConnector:
             data = {}
         response = requests.request(method, url, headers=headers, params=params, data=json.dumps(data))
         if response.status_code == 200:
-            return response.json()
+            if response.headers["content-type"] == "application/json":
+                return response.json()
+            else:
+                return sys.stdout.write(response.text)
         else:
             raise Exception(response.text)

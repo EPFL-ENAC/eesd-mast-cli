@@ -3,3 +3,6 @@ dist
 .env
 __pycache__
 *csv
+*vtk
+*vtp
+test.ipynb

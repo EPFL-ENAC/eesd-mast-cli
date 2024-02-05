@@ -5,23 +5,39 @@ class FilesService:
     def __init__(self, conn: APIConnector):
         self.conn = conn
 
-    def upload(self, path):
+    def upload(self, path, root = None, prefix = ""):
         # Specify the paths to the files to upload
-        file_paths = [path]
+        file_paths = [path] if isinstance(path, str) else path
 
         # Open each file in binary mode and send them as part of the request
-        file_tuples = [("files", (os.path.basename(f), open(f, "rb"), self._get_content_type(f))) for f in file_paths]
-        files = dict(file_tuples)
+        files = []
+        for f in file_paths:
+            files.append(("files", (self._get_file_name(f, root), open(f, "rb"), self._get_content_type(f))))
 
-        return self.conn.upload("/files", files=files)
+        return self.conn.upload(f"{prefix}/files", files=files)
 
-    def delete(self, id):
-        return self.conn.delete(f"/files/{id}")
+    def delete(self, id, prefix = ""):
+        return self.conn.delete(f"{prefix}/files/{id}")
+
+    def _get_file_name(self, path, root = None):
+        if root is None:
+            return os.path.basename(path)
+        return os.path.relpath(path, root)
 
     def _get_content_type(self, path):
         if path.endswith(".png"):
-            return "application/png"
+            return "image/png"
         elif path.endswith(".jpg"):
-            return "application/jpg"
+            return "image/jpeg"
+        elif path.endswith(".webp"):
+            return "image/webp"
+        elif path.endswith(".vtk") or path.endswith(".vtp"):
+            return "application/x-vtk"
+        elif path.endswith(".txt"):
+            return "text/plain"
+        elif path.endswith(".csv"):
+            return "text/csv"
+        elif path.endswith(".zip"):
+            return "application/zip"
         else:
             return "application/octet-stream"

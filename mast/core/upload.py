@@ -225,7 +225,7 @@ def read_xlsx(filename: str) -> pd.DataFrame:
     references.index = np.arange(1, len(references)+1)
     # Clean reference fields from experiments
     experiments["reference_id"] = experiments["reference"].map(lambda x: references[references["reference"] == x].index[0])
-    experiments = experiments.drop(["publication_year", "link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"], axis=1)
+    experiments = experiments.drop(["link_to_experimental_paper", "corresponding_author_name", "corresponding_author_email", "link_to_request_data"], axis=1)
     experiments.index = np.arange(1, len(experiments)+1)
 
     # Merge the references data frame with the full references data frame

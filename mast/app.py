@@ -235,7 +235,7 @@ def rm_reference(
 def references(
     format: str = typer.Option(
         "json",
-        help="Format of the output: json or csv"
+        help="Format of the output: json, csv or tsv"
     ),
     url: str = typer.Option(
         default_url,
@@ -312,7 +312,7 @@ def experiments(
     ),
     format: str = typer.Option(
         "json",
-        help="Format of the output: json or csv"
+        help="Format of the output: json, csv or tsv"
     ),
     url: str = typer.Option(
         default_url,
@@ -342,7 +342,7 @@ def run_results(
     ),
     format: str = typer.Option(
         "json",
-        help="Format of the output: json or csv"
+        help="Format of the output: json, csv or tsv"
     ),
     url: str = typer.Option(
         default_url,
@@ -367,6 +367,8 @@ def run_results(
 def print_output(res, format, pretty):
     """Print the output"""
     if format == "csv":
+        pd.DataFrame(res).to_csv(sys.stdout, index=False, sep=",", quotechar='"')
+    elif format == "tsv":
         pd.DataFrame(res).to_csv(sys.stdout, index=False, sep="\t", quotechar='"')
     else:
         print_json(res, pretty)

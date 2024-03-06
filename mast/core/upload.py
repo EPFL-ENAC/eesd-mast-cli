@@ -141,6 +141,14 @@ def read_experiments(filename: str) -> pd.DataFrame:
     for col in ["experimental_campaign_motivation"]:
         experiments[col] = experiments[col].apply(string_cleanup)
 
+    building_heights = []
+    for i in experiments["id"]:
+        experiment_data = pd.read_excel(open(filename, "rb"), sheet_name=f"B{i}", usecols="A:C", header=15)
+        # find experiment_data value when information is "Building height (without roof structure)"
+        building_height = experiment_data[experiment_data["Information"] == "Building height (without roof structure)"]["Value"].values[0]
+        building_heights.append(building_height)
+    experiments["building_height"] = building_heights
+
     return experiments
 
 def read_references(filename: str) -> pd.DataFrame:

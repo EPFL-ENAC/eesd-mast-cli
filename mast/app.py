@@ -7,6 +7,7 @@ from mast.core.upload import do_upload
 from mast.core.repo import do_generate_repo, do_validate_repo, do_upload_repo
 from mast.services.references import ReferencesService
 from mast.services.experiments import ExperimentsService
+from mast.services.run_results import RunResultsService
 from mast.core.io import APIConnector
 
 # Initialise the Typer class
@@ -333,6 +334,35 @@ def experiments(
     res = service.list(params=params)
     print_output(res, format, pretty)
 
+@app.command()
+def run_results(
+    experiment: int = typer.Option(
+        None,
+        help="ID of the experiment to filter by"
+    ),
+    format: str = typer.Option(
+        "json",
+        help="Format of the output: json or csv"
+    ),
+    url: str = typer.Option(
+        default_url,
+        help="URL of the MAST service API to connect to"
+    ),
+    pretty: bool = typer.Option(
+        False,
+        help="Pretty-print the JSON output"
+    )
+    ) -> None:
+    """Get the list of an experiment's test run results"""
+    service = RunResultsService(APIConnector(url, None))
+    filter = None
+    if experiment:
+        filter = {"experiment_id": experiment}
+    params = None
+    if filter:
+        params = {"filter": json.dumps(filter)}
+    res = service.list(params=params)
+    print_output(res, format, pretty)
 
 def print_output(res, format, pretty):
     """Print the output"""

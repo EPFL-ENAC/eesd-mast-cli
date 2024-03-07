@@ -15,8 +15,11 @@ class ExperimentsService:
     def update(self, id, data):
         return self.conn.put(f"/experiments/{id}", data=data)
 
+    def upload_scheme_file(self, id, file: str):
+        return FilesService(self.conn).upload(file, ws=f"/experiments/{id}/scheme")
+        
     def upload_files(self, id, zipfile: str):
-        return FilesService(self.conn).upload(zipfile, prefix=f"/experiments/{id}")
+        return FilesService(self.conn).upload(zipfile, ws=f"/experiments/{id}/files")
     
     def get_files(self, id, file: str):
         return self.conn.download(f"/experiments/{id}/files", file)

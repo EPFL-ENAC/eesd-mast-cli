@@ -275,10 +275,7 @@ def do_upload(conn: APIConnector, filename: str, with_images: bool) -> None:
     ref_ids = {}
     # map experiment IDs from the Excel file to IDs from the database
     exp_ids = {}
-    exp_ref_ids = {}
-    # map experiment IDs from the Excel file to stored file objects
-    exp_files = {}
-
+    
     # Write the references to the database
     for index, row in tqdm(references.iterrows(), total=references.shape[0], desc="Uploading references", leave=False):
         debug(f">>> checking reference {index}")
@@ -303,31 +300,23 @@ def do_upload(conn: APIConnector, filename: str, with_images: bool) -> None:
         try:
             res = exp_service.createOrUpdate(row.to_dict())
             exp_ids[row["id"]] = res["id"]
-            exp_ref_ids[row["id"]] = res["reference_id"]
             debug(f"<<< experiment {index} written with ID {res['id']}")
         except Exception as e:
             warning(f"<<< experiment {index} not written: {e}")
 
     # Upload experiment images
-    # TODO use a specific experiment service entry point for the images
     if images_dir is not None:
         info(f"Uploading scheme images from {images_dir.name}")
         for img_filename in tqdm(os.listdir(images_dir.name), desc="Uploading images", leave=False):
             try:
                 # image file is named by the experiment ID in the Excel file
-                res = fs_service.upload(os.path.join(images_dir.name, img_filename))
                 exp_id = int(img_filename.split(".")[0])
-                exp_files[exp_id] = res["files"][0]
+                res = exp_service.upload_scheme_file(exp_ids[exp_id], os.path.join(images_dir.name, img_filename))
                 debug(f"<<< image {img_filename} uploaded with response {res}")
             except Exception as e:
                 warning(f"<<< image {img_filename} not uploaded: {e}")
         images_dir.cleanup()
     
-    # Apply the file IDs from the database to the experiments
-    info(f"Applying scheme images to their respective experiment")
-    for row_id in tqdm(exp_files, total=len(exp_files), desc="Applying images to experiments", leave=False):
-        exp_service.update(exp_ids[row_id], { "scheme": exp_files[row_id], "reference_id": exp_ref_ids[row_id] })
-
     # Apply the experiment IDs to the results
     results["experiment_id"] = results["experiment_id"].map(lambda x: int(exp_ids[x]) if x in exp_ids else None)
 

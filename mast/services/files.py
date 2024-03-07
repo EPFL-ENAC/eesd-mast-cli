@@ -5,7 +5,7 @@ class FilesService:
     def __init__(self, conn: APIConnector):
         self.conn = conn
 
-    def upload(self, path, root = None, prefix = ""):
+    def upload(self, path, root = None, ws = "/files"):
         # Specify the paths to the files to upload
         file_paths = [path] if isinstance(path, str) else path
 
@@ -14,10 +14,10 @@ class FilesService:
         for f in file_paths:
             files.append(("files", (self._get_file_name(f, root), open(f, "rb"), self._get_content_type(f))))
 
-        return self.conn.upload(f"{prefix}/files", files=files)
+        return self.conn.upload(ws, files=files)
 
-    def delete(self, id, prefix = ""):
-        return self.conn.delete(f"{prefix}/files/{id}")
+    def delete(self, id, ws = "/files"):
+        return self.conn.delete(f"{ws}/{id}")
 
     def _get_file_name(self, path, root = None):
         if root is None:

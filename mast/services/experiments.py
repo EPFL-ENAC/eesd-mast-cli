@@ -1,3 +1,4 @@
+import json
 from mast.core.io import APIConnector
 from mast.services.files import FilesService
 
@@ -23,8 +24,28 @@ class ExperimentsService:
     def delete_files(self, id):
         return self.conn.delete(f"/experiments/{id}/files")
     
+    def delete_run_results(self, id):
+        return self.conn.delete(f"/experiments/{id}/run_results")
+    
     def delete(self, id, recursive: bool = False):
         self.conn.delete(f"/experiments/{id}?recursive={recursive}")
 
     def list(self, params=None):
         return self.conn.get("/experiments", params=params)
+    
+    def createOrUpdate(self, data):
+        """Create or update an experiment, using its experiment_id and reference_id fields as the composite key"""
+        try:
+            filter = {"reference_id": data["reference_id"], "experiment_id": data["experiment_id"]}
+            params = {"filter": json.dumps(filter)}
+            res = self.list(params=params)
+            if len(res) > 0:
+                data["id"] = res[0]["id"]
+                data.pop("scheme", None) # images will be uploaded separately
+                data.pop("files", None)
+                return self.update(res[0]["id"], data)
+            else:
+                return self.create(data)
+        except Exception as e:
+            return self.create(data)
+        

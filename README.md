@@ -33,10 +33,6 @@ Each experiment comes with its set of test results as files. The experiment's re
 │   ├── <Run ID>.txt
 │   └── ...
 │
-├── Period and DG evolution
-│   ├── DG_evolution.png
-│   └── Period_evolution.png
-│
 ├── Shake-table accelerations
 │   ├── <Run ID>.txt
 │   └── ...

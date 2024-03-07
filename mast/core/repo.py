@@ -27,9 +27,6 @@ def write_empty_run_files(run_ids, parent, ext):
 def get_3d_model_folder(experiment_folder):
   return os.path.join(experiment_folder, "3D model")
 
-def get_period_dg_folder(experiment_folder):
-  return os.path.join(experiment_folder, "Period and DG evolution")
-
 def get_crack_maps_folder(experiment_folder):
   return os.path.join(experiment_folder, "Crack maps")
 
@@ -95,11 +92,6 @@ def do_generate_repo(conn: APIConnector, folder: str, id: str = None):
   md_folder = get_3d_model_folder(experiment_folder)
   os.makedirs(md_folder, exist_ok=True)
   write_empty_file(md_folder, "main.vtk")
-
-  pdge_folder = get_period_dg_folder(experiment_folder)
-  os.makedirs(pdge_folder, exist_ok=True)
-  write_empty_file(pdge_folder, "Period_evolution.png")
-  write_empty_file(pdge_folder, "DG_evolution.png")
 
   cm_folder = get_crack_maps_folder(experiment_folder)
   os.makedirs(cm_folder, exist_ok=True)
@@ -167,14 +159,6 @@ def do_validate_repo(conn: APIConnector, folder_or_zip: str, id: str = None):
       warnings.append(f"Missing at least one .vtk or .vtp file: '3D model'")
   else:
     warnings.append(f"Missing folder: '3D model'")
-  
-  pdge_folder = get_period_dg_folder(experiment_folder)
-  if os.path.exists(pdge_folder):
-    pngs = [f.path for f in os.scandir(pdge_folder) if f.is_file() and f.path.endswith(".png")]
-    if not pngs:
-      warnings.append(f"Missing at least one .png file: 'Period and DG evolution'")
-  else:
-    warnings.append(f"Missing folder: 'Period and DG evolution'")
   
   cm_folder = get_crack_maps_folder(experiment_folder)
   if os.path.exists(cm_folder):

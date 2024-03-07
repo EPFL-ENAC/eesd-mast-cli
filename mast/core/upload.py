@@ -219,7 +219,7 @@ def read_experiment_images(filename: str, experiment_ids) -> TemporaryDirectory:
     return temp_dir
 
 
-def read_xlsx(filename: str) -> pd.DataFrame:
+def read_xlsx(filename: str, with_images: bool) -> pd.DataFrame:
     """Read experiments, references and run results from an Excel file"""
     # Experiments
     experiments = read_experiments(filename)
@@ -244,12 +244,14 @@ def read_xlsx(filename: str) -> pd.DataFrame:
     run_results = read_run_results(filename, experiments["id"])
 
     # Images
-    images_dir = read_experiment_images(filename, experiments["id"])
+    images_dir = None
+    if with_images:
+        images_dir = read_experiment_images(filename, experiments["id"])
     
     return experiments, references, run_results, images_dir
 
 
-def do_upload(conn: APIConnector, filename: str) -> None:
+def do_upload(conn: APIConnector, filename: str, with_images: bool) -> None:
     """Upload a file to the MAST service
 
     Args:
@@ -262,7 +264,7 @@ def do_upload(conn: APIConnector, filename: str) -> None:
     info(f"Upload of {filename} to {conn.api_url}")
 
     # Read the Excel file
-    experiments, references, results, images_dir = read_xlsx(filename)
+    experiments, references, results, images_dir = read_xlsx(filename, with_images)
     
     # Use services
     ref_service = ReferencesService(conn)
@@ -273,20 +275,9 @@ def do_upload(conn: APIConnector, filename: str) -> None:
     ref_ids = {}
     # map experiment IDs from the Excel file to IDs from the database
     exp_ids = {}
+    exp_ref_ids = {}
     # map experiment IDs from the Excel file to stored file objects
     exp_files = {}
-
-    # Upload experiment images
-    info(f"Uploading images from {images_dir.name}")
-    for img_filename in tqdm(os.listdir(images_dir.name), desc="Uploading images", leave=False):
-        try:
-            # image file is named by the experiment ID in the Excel file
-            res = fs_service.upload(os.path.join(images_dir.name, img_filename))
-            exp_id = img_filename.split(".")[0]
-            exp_files[exp_id] = res["files"][0]
-            debug(f"<<< image {img_filename} uploaded with response {res}")
-        except Exception as e:
-            warning(f"<<< image {img_filename} not uploaded: {e}")
 
     # Write the references to the database
     for index, row in tqdm(references.iterrows(), total=references.shape[0], desc="Uploading references", leave=False):
@@ -303,9 +294,6 @@ def do_upload(conn: APIConnector, filename: str) -> None:
     experiments["reference_id"] = experiments["reference"].map(lambda x: int(ref_ids[x]) if x in ref_ids else None)
     experiments = experiments.drop("reference", axis=1)
 
-    # Apply the file IDs from the database to the experiments
-    experiments["scheme"] = experiments["id"].map(lambda x: exp_files[str(x)] if str(x) in exp_files else None)
-
     # Write the experiments to the database
     for index, row in tqdm(experiments.iterrows(), total=experiments.shape[0], desc="Uploading experiments", leave=False):
         if not row["reference_id"] or isnan(row["reference_id"]):
@@ -313,24 +301,48 @@ def do_upload(conn: APIConnector, filename: str) -> None:
             continue
         debug(f">>> writing experiment {index}")
         try:
-            payload = row.to_dict()
-            del payload["id"]
-            res = exp_service.create(row.to_dict())
+            res = exp_service.createOrUpdate(row.to_dict())
             exp_ids[row["id"]] = res["id"]
+            exp_ref_ids[row["id"]] = res["reference_id"]
             debug(f"<<< experiment {index} written with ID {res['id']}")
         except Exception as e:
             warning(f"<<< experiment {index} not written: {e}")
+
+    # Upload experiment images
+    # TODO use a specific experiment service entry point for the images
+    if images_dir is not None:
+        info(f"Uploading scheme images from {images_dir.name}")
+        for img_filename in tqdm(os.listdir(images_dir.name), desc="Uploading images", leave=False):
+            try:
+                # image file is named by the experiment ID in the Excel file
+                res = fs_service.upload(os.path.join(images_dir.name, img_filename))
+                exp_id = int(img_filename.split(".")[0])
+                exp_files[exp_id] = res["files"][0]
+                debug(f"<<< image {img_filename} uploaded with response {res}")
+            except Exception as e:
+                warning(f"<<< image {img_filename} not uploaded: {e}")
+        images_dir.cleanup()
+    
+    # Apply the file IDs from the database to the experiments
+    info(f"Applying scheme images to their respective experiment")
+    for row_id in tqdm(exp_files, total=len(exp_files), desc="Applying images to experiments", leave=False):
+        exp_service.update(exp_ids[row_id], { "scheme": exp_files[row_id], "reference_id": exp_ref_ids[row_id] })
 
     # Apply the experiment IDs to the results
     results["experiment_id"] = results["experiment_id"].map(lambda x: int(exp_ids[x]) if x in exp_ids else None)
 
     # Write the run results to the database
+    info(f"Uploading run results")
+    exp_run_results_deleted = []
     for index, row in tqdm(results.iterrows(), total=results.shape[0], desc="Uploading run results", leave=False):
         if not row["experiment_id"] or isnan(row["experiment_id"]):
             debug(f">>> NOT writing run result {index}: {row['experiment_id']}")
             continue
         debug(f">>> writing run result {index} from experiment {row['experiment_id']}")
         try:
+            if row["experiment_id"] not in exp_run_results_deleted:
+                exp_service.delete_run_results(row["experiment_id"])
+                exp_run_results_deleted.append(row["experiment_id"])
             payload = row.to_dict()
             res = res_service.create(payload)
             debug(f"<<< run result {index} written")

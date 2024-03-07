@@ -36,13 +36,15 @@ def upload(
     url: str = typer.Option(
         default_url, 
         help="URL of the MAST service API to connect to"
+    ),
+    images: bool = typer.Option(
+        True,
+        help="Upload thumbnail images"
     )
     ) -> None:
-    """Import an Excel file with metadata to the database.
-
-    The Excel file must have the following columns: x, y, z.
+    """Import an Excel file with metadata to the database. References and experiments will be created or updated.
     """
-    do_upload(APIConnector(url, key), filename)
+    do_upload(APIConnector(url, key), filename, images)
 
 @app.command()
 def generate_repo(

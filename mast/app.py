@@ -61,7 +61,7 @@ def generate_repo(
         help="URL of the MAST service API to connect to"
     )
     ) -> None:
-    """Generates the experiment's rfile epository structure.
+    """Generates the experiment's file repository structure.
 
     If the experiment ID is provided, the experiment's metadata will be used to generate the README.md file
     and folders will be filled in with the empty expected run result files.
@@ -85,6 +85,10 @@ def validate_repo(
         ...,
         help="Path to the file where experiment's files are located, can be a folder or a zip file"
     ),
+    type: str = typer.Option(
+        "files",
+        help="Type of the file to upload: files or models"
+    ),
     id: str = typer.Option(
         None,
         help="ID of the experiment to retrieve to validate the experiment files repository"
@@ -96,7 +100,7 @@ def validate_repo(
     ) -> None:
     """Validates the experiment's file repository structure.
     """
-    warnings, errors = do_validate_repo(APIConnector(url, None), file, id)
+    warnings, errors = do_validate_repo(APIConnector(url, None), file, type, id)
     if warnings:
         for warn in warnings:
             warning(warn)
@@ -106,13 +110,17 @@ def validate_repo(
 
 @app.command()
 def upload_repo(
+    id: str = typer.Argument(
+        ...,
+        help="ID of the experiment to link with"
+    ),
     file: str = typer.Argument(
         ...,
         help="Path to the file where experiment's files are located, can be a folder or a zip file"
     ),
-    id: str = typer.Option(
-        ...,
-        help="ID of the experiment to link with"
+    type: str = typer.Option(
+        "files",
+        help="Type of the file to upload: files or models"
     ),
     force: bool = typer.Option(
         False,
@@ -133,7 +141,7 @@ def upload_repo(
     ) -> None:
     """Upload the experiment's file repository.
     """
-    experiment = do_upload_repo(APIConnector(url, key), file, id, force)
+    experiment = do_upload_repo(APIConnector(url, key), file, id, type, force)
     print_json(experiment, pretty)
 
 @app.command()
@@ -141,6 +149,10 @@ def download_repo(
     id: str = typer.Argument(
         ...,
         help="ID of the experiment which files are to be downloaded"
+    ),
+    type: str = typer.Option(
+        "files",
+        help="Type of the file to download: files or models"
     ),
     file: str = typer.Option(
         ...,
@@ -153,13 +165,17 @@ def download_repo(
     ) -> None:
     """Delete the experiment's file repository.
     """
-    ExperimentsService(APIConnector(url, None)).get_files(id, file)
+    ExperimentsService(APIConnector(url, None)).get_files(id, type, file)
 
 @app.command()
 def rm_repo(
     id: str = typer.Argument(
         ...,
         help="ID of the experiment which files are to be deleted"
+    ),
+    type: str = typer.Option(
+        "files",
+        help="Type of the file to download: files or models"
     ),
     force: bool = typer.Option(
         False,
@@ -178,7 +194,7 @@ def rm_repo(
     """Delete the experiment's file repository.
     """
     if force:
-        ExperimentsService(APIConnector(url, key)).delete_files(id)
+        ExperimentsService(APIConnector(url, key)).delete_files(id, type)
     
 #
 # References

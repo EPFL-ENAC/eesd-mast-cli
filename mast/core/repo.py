@@ -89,10 +89,6 @@ def do_generate_repo(conn: APIConnector, folder: str, id: str = None):
   
   experiment_folder = os.path.expanduser(folder)
 
-  md_folder = get_3d_model_folder(experiment_folder)
-  os.makedirs(md_folder, exist_ok=True)
-  write_empty_file(md_folder, "main.vtk")
-
   cm_folder = get_crack_maps_folder(experiment_folder)
   os.makedirs(cm_folder, exist_ok=True)
   write_empty_run_files(run_ids, cm_folder, "png")
@@ -126,7 +122,7 @@ def do_generate_repo(conn: APIConnector, folder: str, id: str = None):
   return experiment_folder
 
 
-def do_validate_repo(conn: APIConnector, folder_or_zip: str, id: str = None):
+def do_validate_repo(conn: APIConnector, folder_or_zip: str, type: str, id: str = None):
   warnings = []
   errors = []
   experiment_folder = os.path.expanduser(folder_or_zip)
@@ -141,59 +137,70 @@ def do_validate_repo(conn: APIConnector, folder_or_zip: str, id: str = None):
       errors.append(f"Experiment repository must be either a folder or a zip file")
       return warnings, errors
   
-  experiment = None
-  run_ids = []
   if id:
     try:
-      experiment = ExperimentsService(conn).get(id)
-      run_results = RunResultsService(conn).list({"filter": json.dumps({"experiment_id": int(id)})})
-      run_ids = [run_result["run_id"] for run_result in run_results if run_result["run_id"] not in ["Initial", "Final"]]
+      ExperimentsService(conn).get(id)
     except:
       errors.append(f"Experiment with id {id} does not exist")
       return warnings, errors
-
-  md_folder = get_3d_model_folder(experiment_folder)
-  if os.path.exists(md_folder):
-    vtks = [f.path for f in os.scandir(md_folder) if f.is_file() and (f.path.endswith(".vtk") or f.path.endswith(".vtp"))]
-    if not vtks:
-      warnings.append(f"Missing at least one .vtk or .vtp file: '3D model'")
-  else:
-    warnings.append(f"Missing folder: '3D model'")
   
-  cm_folder = get_crack_maps_folder(experiment_folder)
-  if os.path.exists(cm_folder):
-    for run_id in run_ids:
-      if not os.path.exists(os.path.join(cm_folder, f"{run_id}.png")):
-        warnings.append(f"Missing file: 'Crack maps/{run_id}.png'")
-  else:
-    warnings.append(f"Missing folder: 'Crack maps'")
+  if type == "files":
+    run_ids = []
+    if id:
+      try:
+        run_results = RunResultsService(conn).list({"filter": json.dumps({"experiment_id": int(id)})})
+        run_ids = [run_result["run_id"] for run_result in run_results if run_result["run_id"] not in ["Initial", "Final"]]
+      except:
+        errors.append(f"Experiment with id {id} does not exist")
+        return warnings, errors
+    
+    cm_folder = get_crack_maps_folder(experiment_folder)
+    if os.path.exists(cm_folder):
+      for run_id in run_ids:
+        if not os.path.exists(os.path.join(cm_folder, f"{run_id}.png")):
+          warnings.append(f"Missing file: 'Crack maps/{run_id}.png'")
+    else:
+      warnings.append(f"Missing folder: 'Crack maps'")
+    
+    gfdc_folder = get_global_force_displacement_curve_folder(experiment_folder)
+    if os.path.exists(gfdc_folder):
+      for run_id in run_ids:
+        if not os.path.exists(os.path.join(gfdc_folder, f"{run_id}.txt")):
+          warnings.append(f"Missing file: 'Global force-displacement curve/{run_id}.txt'")
+    else:
+      warnings.append(f"Missing folder: 'Global force-displacement curve'")  
+
+    sta_folder = get_shake_table_accelerations_folder(experiment_folder)
+    if os.path.exists(sta_folder):
+      for run_id in run_ids:
+        if not os.path.exists(os.path.join(sta_folder, f"{run_id}.txt")):
+          warnings.append(f"Missing file: 'Shake-table accelerations folder/{run_id}.txt'")
+    else:
+      warnings.append(f"Missing folder: 'Shake-table accelerations'")
+
+    tdh_folder = get_top_displacement_histories_folder(experiment_folder)
+    if os.path.exists(tdh_folder):
+      for run_id in run_ids:
+        if not os.path.exists(os.path.join(tdh_folder, f"{run_id}.txt")):
+          warnings.append(f"Missing file: 'Top displacement histories/{run_id}.txt'")
+    else:
+      warnings.append(f"Missing folder: 'Top displacement histories'")
   
-  gfdc_folder = get_global_force_displacement_curve_folder(experiment_folder)
-  if os.path.exists(gfdc_folder):
-    for run_id in run_ids:
-      if not os.path.exists(os.path.join(gfdc_folder, f"{run_id}.txt")):
-        warnings.append(f"Missing file: 'Global force-displacement curve/{run_id}.txt'")
-  else:
-    warnings.append(f"Missing folder: 'Global force-displacement curve'")  
+  elif type == "models":
+    path = os.path.join(experiment_folder, "geometry.vtk")
+    if not os.path.exists(path):
+      warnings.append(f"geometry.vtk file does not exist")
+      
+    path = os.path.join(experiment_folder, "scheme.png")
+    if not os.path.exists(path):
+      warnings.append(f"scheme.png file does not exist")
 
-  sta_folder = get_shake_table_accelerations_folder(experiment_folder)
-  if os.path.exists(sta_folder):
-    for run_id in run_ids:
-      if not os.path.exists(os.path.join(sta_folder, f"{run_id}.txt")):
-        warnings.append(f"Missing file: 'Shake-table accelerations folder/{run_id}.txt'")
-  else:
-    warnings.append(f"Missing folder: 'Shake-table accelerations'")
-
-  tdh_folder = get_top_displacement_histories_folder(experiment_folder)
-  if os.path.exists(tdh_folder):
-    for run_id in run_ids:
-      if not os.path.exists(os.path.join(tdh_folder, f"{run_id}.txt")):
-        warnings.append(f"Missing file: 'Top displacement histories/{run_id}.txt'")
-  else:
-    warnings.append(f"Missing folder: 'Top displacement histories'")
-
-  rdm_path = os.path.join(experiment_folder, "README.md")
-  if not os.path.exists(rdm_path):
+  path = os.path.join(experiment_folder, "License.md")
+  if not os.path.exists(path):
+    warnings.append(f"License.md file does not exist")
+  
+  path = os.path.join(experiment_folder, "README.md")
+  if not os.path.exists(path):
     warnings.append(f"README.md file does not exist")
 
   if folder_or_zip.endswith(".zip"):
@@ -202,7 +209,7 @@ def do_validate_repo(conn: APIConnector, folder_or_zip: str, id: str = None):
 
   return warnings, errors
 
-def do_upload_repo(conn: APIConnector, file: str, id: str = None, force: bool = False):
+def do_upload_repo(conn: APIConnector, file: str, id: str = None, type: str = "files", force: bool = False):
     in_file = os.path.expanduser(file)
     is_temp = False
     if not os.path.isfile(in_file):
@@ -213,7 +220,7 @@ def do_upload_repo(conn: APIConnector, file: str, id: str = None, force: bool = 
       error("Not a zip file, aborting upload")
       return
 
-    warnings, errors = do_validate_repo(conn, os.path.expanduser(file), id)
+    warnings, errors = do_validate_repo(conn, os.path.expanduser(file), type, id)
     if errors:
         for err in errors:
             error(err)
@@ -226,7 +233,7 @@ def do_upload_repo(conn: APIConnector, file: str, id: str = None, force: bool = 
         if not force:
             typer.confirm("Do you want to continue?", abort=True)
 
-    res = ExperimentsService(conn).upload_files(id, in_file)
+    res = ExperimentsService(conn).upload_files(id, type, in_file)
     if is_temp:
       os.remove(in_file)
     return res

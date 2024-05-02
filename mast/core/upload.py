@@ -13,7 +13,6 @@ from openpyxl import load_workbook
 from openpyxl_image_loader import SheetImageLoader
 
 from mast.core.io import APIConnector
-from mast.services.files import FilesService
 from mast.services.references import ReferencesService
 from mast.services.experiments import ExperimentsService
 from mast.services.run_results import RunResultsService
@@ -70,7 +69,7 @@ def read_experiments(filename: str) -> pd.DataFrame:
 
     # Rename the columns
     experiments.rename(columns = {
-        "Building #": "id",
+        "Building #": "building_id",
         "Scheme": "scheme",
         "Reference": "reference",
         "Publication year": "publication_year",
@@ -142,7 +141,7 @@ def read_experiments(filename: str) -> pd.DataFrame:
         experiments[col] = experiments[col].apply(string_cleanup)
 
     building_heights = []
-    for i in experiments["id"]:
+    for i in experiments["building_id"]:
         experiment_data = pd.read_excel(open(filename, "rb"), sheet_name=f"B{i}", usecols="A:C", header=15)
         # find experiment_data value when information is "Building height (without roof structure)"
         building_height = experiment_data[experiment_data["Information"] == "Building height (without roof structure)"]["Value"].values[0]
@@ -152,9 +151,9 @@ def read_experiments(filename: str) -> pd.DataFrame:
     return experiments
 
 def read_references(filename: str) -> pd.DataFrame:
-    """Read references from References sheet"""
-    info("Reading sheet (References)")
-    references = pd.read_excel(open(filename, "rb"), sheet_name="References", usecols="A:C", header=1)
+    """Read references from Test references sheet"""
+    info("Reading sheet (Test references)")
+    references = pd.read_excel(open(filename, "rb"), sheet_name="Test references", usecols="A:C", header=1)
     references.drop("Excel sheet name", axis=1, inplace=True)
     references.rename(columns={"Building #": "experiment_id", "Reference": "full_reference"}, inplace=True)
     return references
@@ -241,12 +240,12 @@ def read_xlsx(filename: str, with_images: bool) -> pd.DataFrame:
     references = pd.merge(references, full_reference, left_index=True, right_on="reference_id").drop("reference_id", axis=1)
 
     # Run results
-    run_results = read_run_results(filename, experiments["id"])
+    run_results = read_run_results(filename, experiments["building_id"])
 
     # Images
     images_dir = None
     if with_images:
-        images_dir = read_experiment_images(filename, experiments["id"])
+        images_dir = read_experiment_images(filename, experiments["building_id"])
     
     return experiments, references, run_results, images_dir
 
@@ -270,7 +269,6 @@ def do_upload(conn: APIConnector, filename: str, with_images: bool) -> None:
     ref_service = ReferencesService(conn)
     exp_service = ExperimentsService(conn)
     res_service = RunResultsService(conn)
-    fs_service = FilesService(conn)
     # map reference short name to IDs from the database
     ref_ids = {}
     # map experiment IDs from the Excel file to IDs from the database
@@ -299,7 +297,7 @@ def do_upload(conn: APIConnector, filename: str, with_images: bool) -> None:
         debug(f">>> writing experiment {index}")
         try:
             res = exp_service.createOrUpdate(row.to_dict())
-            exp_ids[row["id"]] = res["id"]
+            exp_ids[row["building_id"]] = res["id"]
             debug(f"<<< experiment {index} written with ID {res['id']}")
         except Exception as e:
             warning(f"<<< experiment {index} not written: {e}")

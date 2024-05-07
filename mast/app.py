@@ -86,8 +86,8 @@ def validate_repo(
         help="Path to the file where experiment's files are located, can be a folder or a zip file"
     ),
     type: str = typer.Option(
-        "files",
-        help="Type of the file to upload: files or models"
+        "test",
+        help="Type of the file to upload: test, model or plan"
     ),
     id: str = typer.Option(
         None,
@@ -119,8 +119,8 @@ def upload_repo(
         help="Path to the file where experiment's files are located, can be a folder or a zip file"
     ),
     type: str = typer.Option(
-        "files",
-        help="Type of the file to upload: files or models"
+        "test",
+        help="Type of the file to upload: test, model or plan"
     ),
     force: bool = typer.Option(
         False,
@@ -151,8 +151,8 @@ def download_repo(
         help="ID of the experiment which files are to be downloaded"
     ),
     type: str = typer.Option(
-        "files",
-        help="Type of the file to download: files or models"
+        "test",
+        help="Type of the file to download: test, model or plan"
     ),
     file: str = typer.Option(
         ...,
@@ -174,8 +174,8 @@ def rm_repo(
         help="ID of the experiment which files are to be deleted"
     ),
     type: str = typer.Option(
-        "files",
-        help="Type of the file to download: files or models"
+        "test",
+        help="Type of the file to download: test, model or plan"
     ),
     force: bool = typer.Option(
         False,

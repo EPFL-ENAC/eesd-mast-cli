@@ -19,13 +19,13 @@ class ExperimentsService:
         return FilesService(self.conn).upload(file, ws=f"/experiments/{id}/scheme")
         
     def upload_files(self, id, type: str, zipfile: str):
-        return FilesService(self.conn).upload(zipfile, ws=f"/experiments/{id}/{type}")
+        return FilesService(self.conn).upload(zipfile, ws=f"/experiments/{id}/{type}-files")
     
     def get_files(self, id, type: str, file: str):
-        return self.conn.download(f"/experiments/{id}/{type}", file)
+        return self.conn.download(f"/experiments/{id}/{type}-files", file)
     
     def delete_files(self, id, type: str):
-        return self.conn.delete(f"/experiments/{id}/{type}")
+        return self.conn.delete(f"/experiments/{id}/{type}-files")
     
     def delete_run_results(self, id):
         return self.conn.delete(f"/experiments/{id}/run_results")

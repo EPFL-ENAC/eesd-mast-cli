@@ -144,7 +144,7 @@ def do_validate_repo(conn: APIConnector, folder_or_zip: str, type: str, id: str 
       errors.append(f"Experiment with id {id} does not exist")
       return warnings, errors
   
-  if type == "files":
+  if type == "test":
     run_ids = []
     if id:
       try:
@@ -186,7 +186,7 @@ def do_validate_repo(conn: APIConnector, folder_or_zip: str, type: str, id: str 
     else:
       warnings.append(f"Missing folder: 'Top displacement histories'")
   
-  elif type == "models":
+  elif type == "model":
     path = os.path.join(experiment_folder, "geometry.vtk")
     if not os.path.exists(path):
       warnings.append(f"geometry.vtk file does not exist")
@@ -209,7 +209,7 @@ def do_validate_repo(conn: APIConnector, folder_or_zip: str, type: str, id: str 
 
   return warnings, errors
 
-def do_upload_repo(conn: APIConnector, file: str, id: str = None, type: str = "files", force: bool = False):
+def do_upload_repo(conn: APIConnector, file: str, id: str = None, type: str = "test", force: bool = False):
     in_file = os.path.expanduser(file)
     is_temp = False
     if not os.path.isfile(in_file):

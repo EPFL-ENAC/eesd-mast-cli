@@ -6,48 +6,102 @@ Visit [EESD lab at EPFL](https://www.epfl.ch/labs/eesd/).
 
 This tool is a command-line interface to the MAST API, for data upload, extraction and analysis.
 
-## Experiments Database
-
-### Excel Database Upload
-
-To upload experiments with their reference article and test runs summaries, use the command:
+Usage:
 
 ```
-mast upload --help
+mast --help
 ```
 
-### Experiment Repository Conventions
+## Buildings Database
 
-Each experiment comes with its set of test results as files. The experiment's repository conventions are:
+The buildings folder contains the data for provisionning the MAST web application, using the mast CLI.
 
 ```
 .
-├── 3D model
-│   └── main.vtk (or main.vtp)
-│
-├── Crack maps
-│   ├── <Run ID>.png
-│   └── ...
-│
-├── Global force-displacement curve
-│   ├── <Run ID>.txt
-│   └── ...
-│
-├── Shake-table accelerations
-│   ├── <Run ID>.txt
-│   └── ...
-│
-└── Top displacement histories
-    ├── <Run ID>.txt
-    └── ...
+├── <Building ID>_XXXX
+│   ├── model
+│   │   ├── OpenSees
+│   │   │   └── <...>
+│   │   ├── geometry.vtk
+│   │   ├── scheme.png
+│   │   ├── License.md
+│   │   └── README.md
+│   ├── plan
+│   │   ├── <some name>.png
+│   │   ├── License.md
+│   │   └── README.md
+│   └── test
+│       ├── Crack maps
+│       │   ├── <run ID>.png
+│       │   └── <...>.png
+│       ├── Global force-displacement curve
+│       │   ├── <run ID>.txt
+│       │   └── <...>.txt
+│       ├── Shake-table accelerations
+│       │   ├── <run ID>.txt
+│       │   └── <...>.txt
+│       ├── Top displacement histories
+│       │   ├── <run ID>.txt
+│       │   └── <...>.txt
+│       ├── License.md
+│       └── README.md
+├── Readme.md
+└── Shake_Table_Tests_Database_XXXXX.xlsx
 ```
 
-where:
+### Excel database
 
-* The 3D model can be in multiple files in VTK format (both `.vtk` or `.vtp` file extensions are supported)
-* `Run ID` is one of the run results identifiers declared in the database.
-* `.png` files are images.
-* `.txt` files are data files in tab separated values format.
+Several .xlsx files can be provided, named by date or version.
+
+Command to update the database:
+
+```
+mast upload --key xxxxxxx 00_MAST_Database/Shake_Table_Tests_Database_XXXXX.xlsx
+```
+
+### Building data folders
+
+Provide one data folder per building. The naming conventions are:
+
+1. Building folder name starts with Building's ID (leading zeros are ok). The subsequent part of the name (after _) is ignored.
+2. In each folder, the data files are organized as follows:
+  * `model`, contains the numerical model files
+    * `geometry.vtk` is the main 3D model, additional VTK files (with any name) can be provided.
+    * `scheme.png` is the main model image that will appear in the Buildings page. Other png files for additional model views, can be provided (with any names).
+    * Any folder, with like the OpenSees example can be provided.
+    * README.md, recommended and optional
+    * License.md, recommended and optional
+  * `plan`, contains the plan view files
+    * Any png file name.
+    * README.md, recommended and optional
+    * License.md, recommended and optional
+  * `test`, contains the test files
+    * `Crack maps`, png files, named by the corresponding run ID
+    * `Global force-displacement curve`, txt files, named by the corresponding run ID
+    * `Shake-table accelerations`, txt files, named by the corresponding run ID
+    * `Top displacement histories`, txt files, named by the corresponding run ID
+    * Any folder, with like can be provided.
+    * README.md, recommended and optional
+    * License.md, recommended and optional
+
+
+Command to update all the database files:
+
+```
+mast upload-repo-bulk --key xxxxxxx 00_MAST_Database
+```
+
+Command to update a specific type of database files of a specific Building:
+
+```
+mast upload-repo --key xxxxxxx --type model 1 00_MAST_Database/001_Beyer_2015/model
+```
+
+Command to remove a specific type of database files of a specific Building:
+
+```
+mast rm-repo --key xxxxxxx --type model 1
+```
 
 In order to help with the setup and the validation of an experiment's local repository, use the commands:
 
@@ -61,22 +115,10 @@ To validate an existing experiment data files repository, use the command:
 mast validate-repo --help
 ```
 
-To upload an experiment data files local folder or zip archive, use the command:
-
-```
-mast upload-repo --help
-```
-
 To download an experiment data files repository into a local folder, use the command:
 
 ```
 mast download-repo --help
-```
-
-To remove the experiment data files, use the command:
-
-```
-mast rm-repo --help
 ```
 
 ## Development

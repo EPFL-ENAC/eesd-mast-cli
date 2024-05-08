@@ -51,7 +51,7 @@ def string_cleanup(x):
 
 def read_experiments(filename: str) -> pd.DataFrame:
     """Read experiments from Summary sheet"""
-    info("Reading sheet (Summary)")
+    info("  Reading sheet (Summary)")
     Database_summary = pd.read_excel(open(filename, "rb"), sheet_name="Summary")
 
     # Initialize an empty list to store the data
@@ -141,18 +141,25 @@ def read_experiments(filename: str) -> pd.DataFrame:
         experiments[col] = experiments[col].apply(string_cleanup)
 
     building_heights = []
+    link_to_material_papers = []
     for i in experiments["building_id"]:
         experiment_data = pd.read_excel(open(filename, "rb"), sheet_name=f"B{i}", usecols="A:C", header=15)
         # find experiment_data value when information is "Building height (without roof structure)"
         building_height = experiment_data[experiment_data["Information"] == "Building height (without roof structure)"]["Value"].values[0]
         building_heights.append(building_height)
+        # find experiment_data value when information is "Link to material characterization document"
+        # note: assuming links without Information are also material characterization documents
+        experiment_links = experiment_data[(experiment_data["Value"].notna()) & (experiment_data["Value"].str.startswith("http")) & ((experiment_data["Information"].isna()) | (experiment_data["Information"].str.contains("Link to material characterization document")))]
+        #print(experiment_links["Value"].tolist())
+        link_to_material_papers.append(experiment_links["Value"].tolist())
     experiments["building_height"] = building_heights
+    experiments["link_to_material_papers"] = link_to_material_papers
 
     return experiments
 
 def read_references(filename: str) -> pd.DataFrame:
     """Read references from Test references sheet"""
-    info("Reading sheet (Test references)")
+    info("  Reading sheet (Test references)")
     references = pd.read_excel(open(filename, "rb"), sheet_name="Test references", usecols="A:C", header=1)
     references.drop("Excel sheet name", axis=1, inplace=True)
     references.rename(columns={"Building #": "experiment_id", "Reference": "full_reference"}, inplace=True)
@@ -167,7 +174,7 @@ def read_run_results(filename: str, experiment_ids) -> pd.DataFrame:
 
     run_results = []
     for i in tqdm(experiment_ids, desc="Reading run results from experiment sheets", leave=False):
-        debug(f"reading sheet (B{i})")
+        debug(f"  Reading sheet (B{i})")
         results = pd.read_excel(open(filename, "rb"), sheet_name=f"B{i}", usecols="F:U", header=2)
         results = results.loc[results["Run ID"].apply(run_id_check)]
         results.rename(columns = {
@@ -201,7 +208,7 @@ def read_run_results(filename: str, experiment_ids) -> pd.DataFrame:
 def read_experiment_images(filename: str, experiment_ids) -> TemporaryDirectory:
     """Read experiment images from the Summary sheet"""
     temp_dir = TemporaryDirectory()
-    info(f"Reading images from experiment sheets into {temp_dir.name}")
+    info(f"  Reading images from experiment sheets into {temp_dir.name}")
     wb = load_workbook(filename)
     sheet = wb["Summary"]
     image_loader = SheetImageLoader(sheet)
@@ -250,7 +257,7 @@ def read_xlsx(filename: str, with_images: bool) -> pd.DataFrame:
     return experiments, references, run_results, images_dir
 
 
-def do_upload(conn: APIConnector, filename: str, with_images: bool) -> None:
+def do_upload(conn: APIConnector, filename: str, with_images: bool, dry_run: bool) -> None:
     """Upload a file to the MAST service
 
     Args:
@@ -264,6 +271,14 @@ def do_upload(conn: APIConnector, filename: str, with_images: bool) -> None:
 
     # Read the Excel file
     experiments, references, results, images_dir = read_xlsx(filename, with_images)
+    
+    if dry_run:
+        info("Dry run: no data will be uploaded")
+        info("  Writing experiments.csv")
+        experiments.to_csv("experiments.csv", sep=",", index=False)
+        info("  Writing references.csv")
+        references.to_csv("references.csv", sep=",", index=False)
+        return
     
     # Use services
     ref_service = ReferencesService(conn)

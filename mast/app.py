@@ -2,6 +2,7 @@ import typer
 import json
 import pandas as pd
 import sys
+import os
 from logging import INFO, basicConfig, info, warning, error
 from mast.core.upload import do_upload
 from mast.core.repo import do_generate_repo, do_validate_repo, do_upload_repo
@@ -40,11 +41,15 @@ def upload(
     images: bool = typer.Option(
         True,
         help="Upload thumbnail images"
-    )
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        help="Dry run, do not upload to the database, just print read data"
+    ),
     ) -> None:
     """Import an Excel file with metadata to the database. References and experiments will be created or updated.
     """
-    do_upload(APIConnector(url, key), filename, images)
+    do_upload(APIConnector(url, key), filename, images, dry_run)
 
 @app.command()
 def generate_repo(
@@ -195,7 +200,49 @@ def rm_repo(
     """
     if force:
         ExperimentsService(APIConnector(url, key)).delete_files(id, type)
+
+@app.command()
+def upload_repo_bulk(
+    file: str = typer.Argument(
+        ...,
+        help="Path to the file where experiments' folders are located"
+    ),
+    type: str = typer.Option(
+        None,
+        help="Type of the file to download: test, model or plan"
+    ),
+    key: str = typer.Option(
+        ...,
+        help="API key to authenticate with the MAST service"
+    ),
+    url: str = typer.Option(
+        default_url, 
+        help="URL of the MAST service API to connect to"
+    )
+    ) -> None:
+    """Bulk upload of the experiments' files repositories. Experiment ID is guessed from the folder name. Expected subfolders are 'test', 'model' and 'plan'.
+    """
+    subfolders = [f.path for f in os.scandir(file) if f.is_dir()]
+    #print(subfolders)
+    ids = [os.path.basename(f).split("_")[0].lstrip('0') for f in subfolders]
+    #print(ids)
+    if not type:
+        type = ["test", "model", "plan"]
+    else:
+        type = [type]
     
+    for i, id in enumerate(ids):
+        for t in type:
+            type_folder = os.path.join(subfolders[i], t)
+            if not os.path.exists(type_folder):
+                warning(f"Folder {type_folder} not found, skipping")
+                # ExperimentsService(APIConnector(url, key)).delete_files(id, t)
+                continue
+            info(f"Uploading {t} files for experiment {id} from {type_folder}")
+            ExperimentsService(APIConnector(url, key)).delete_files(id, t)
+            do_upload_repo(APIConnector(url, key), type_folder, id, t, True)
+    
+
 #
 # References
 #

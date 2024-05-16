@@ -51,12 +51,24 @@ The buildings folder contains the data for provisionning the MAST web applicatio
 
 ### Excel database
 
-Several .xlsx files can be provided, named by date or version.
+#### Building experiments, references and run results
 
-Command to update the database:
+The .xlsx file from which the building experiments (experiment description, reference and run results) are to be uploaded is to be explicitly specified.
+
+Command to update the database of building experiments, reference and run results:
 
 ```
 mast upload --key xxxxxxx 00_MAST_Database/Shake_Table_Tests_Database_XXXXX.xlsx
+```
+
+#### Building numerical models
+
+The .xlsx file from which the building numerical models are to be uploaded is to be explicitly specified, and MUST happen after the building experiments have been uploaded (see above). 
+
+Command to update the database of building experiments, reference and run results:
+
+```
+mast upload-models --key xxxxxxx 00_MAST_Database/.xlsx
 ```
 
 ### Building data folders

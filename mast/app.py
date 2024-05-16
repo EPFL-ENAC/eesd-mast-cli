@@ -1,14 +1,14 @@
 import typer
 import json
-import pandas as pd
-import sys
 import os
 from logging import INFO, basicConfig, info, warning, error
-from mast.core.upload import do_upload
+from mast.core.utils import print_json, print_output
+from mast.core.upload import do_upload, do_upload_models
 from mast.core.repo import do_generate_repo, do_validate_repo, do_upload_repo
 from mast.services.references import ReferencesService
 from mast.services.experiments import ExperimentsService
 from mast.services.run_results import RunResultsService
+from mast.services.numerical_models import NumericalModelsService
 from mast.core.io import APIConnector
 
 # Initialise the Typer class
@@ -51,6 +51,29 @@ def upload(
     """
     do_upload(APIConnector(url, key), filename, images, dry_run)
 
+@app.command()
+def upload_models(
+    filename: str = typer.Argument(
+        ...,
+        help="Path to the Excel file to import"
+    ),
+    key: str = typer.Option(
+        ...,
+        help="API key to authenticate with the MAST service"
+    ),
+    url: str = typer.Option(
+        default_url, 
+        help="URL of the MAST service API to connect to"
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        help="Dry run, do not upload to the database, just print read data"
+    ),
+    ) -> None:
+    """Import an Excel file with metadata to the database. Numerical models will be created or updated.
+    """
+    do_upload_models(APIConnector(url, key), filename, dry_run)
+    
 @app.command()
 def generate_repo(
     folder: str = typer.Argument(
@@ -418,7 +441,7 @@ def run_results(
         help="Pretty-print the JSON output"
     )
     ) -> None:
-    """Get the list of an experiment's test run results"""
+    """Get the list of some experiment's test run results"""
     service = RunResultsService(APIConnector(url, None))
     filter = None
     if experiment:
@@ -429,21 +452,63 @@ def run_results(
     res = service.list(params=params)
     print_output(res, format, pretty)
 
-def print_output(res, format, pretty):
-    """Print the output"""
-    if format == "csv":
-        pd.DataFrame(res).to_csv(sys.stdout, index=False, sep=",", quotechar='"')
-    elif format == "tsv":
-        pd.DataFrame(res).to_csv(sys.stdout, index=False, sep="\t", quotechar='"')
-    else:
-        print_json(res, pretty)
 
-def print_json(res, pretty):
-    """Print the JSON response"""
-    if pretty:
-        print(json.dumps(res, sort_keys=True, indent=4))
-    else:
-        print(json.dumps(res))
+@app.command()
+def numerical_models(
+    experiment: int = typer.Option(
+        None,
+        help="ID of the experiment to filter by"
+    ),
+    format: str = typer.Option(
+        "json",
+        help="Format of the output: json, csv or tsv"
+    ),
+    url: str = typer.Option(
+        default_url,
+        help="URL of the MAST service API to connect to"
+    ),
+    pretty: bool = typer.Option(
+        False,
+        help="Pretty-print the JSON output"
+    )
+    ) -> None:
+    """Get the some experiment's numerical models"""
+    service = NumericalModelsService(APIConnector(url, None))
+    filter = None
+    if experiment:
+        filter = {"experiment_id": experiment}
+    params = None
+    if filter:
+        params = {"filter": json.dumps(filter)}
+    res = service.list(params=params)
+    print_output(res, format, pretty)
+
+
+@app.command()
+def numerical_model(
+    id: str = typer.Argument(
+        ...,
+        help="ID of the experiment to filter by"
+    ),
+    format: str = typer.Option(
+        "json",
+        help="Format of the output: json, csv or tsv"
+    ),
+    url: str = typer.Option(
+        default_url,
+        help="URL of the MAST service API to connect to"
+    ),
+    pretty: bool = typer.Option(
+        False,
+        help="Pretty-print the JSON output"
+    )
+    ) -> None:
+    """Get the the experiment's numerical model"""
+    service = ExperimentsService(APIConnector(url, None))
+    res = service.get_numerical_model(id)
+    print_output(res, format, pretty)
+
+
 
 def main() -> None:
     """The main function of the application

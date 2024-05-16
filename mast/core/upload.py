@@ -12,38 +12,12 @@ from tqdm import tqdm
 from openpyxl import load_workbook
 from openpyxl_image_loader import SheetImageLoader
 
+from mast.core.utils import print_json, value_cleanup, number_cleanup, array_formatter, yesno_cleanup, string_cleanup
 from mast.core.io import APIConnector
 from mast.services.references import ReferencesService
 from mast.services.experiments import ExperimentsService
 from mast.services.run_results import RunResultsService
-
-#
-# Excel cell values cleanup functions
-#
-
-def number_cleanup(x):
-    """Clean a number value"""
-    rval = x
-    if not isinstance(x, Number) or isnan(x):
-        rval = None
-    return rval
-
-def array_formatter(x):
-    """Format an array value: split string value when necessary, ensure singletons are in a list"""
-    if isinstance(x, Number) and isnan(x):
-        return None
-    if isinstance(x, str):
-        x = x.strip()
-        x = re.split(r"\n|/", x)
-    return x if isinstance(x, list) else [x]
-
-def yesno_cleanup(x):
-    """Clean a yes/no value to boolean"""
-    return x != None and x != "No"
-
-def string_cleanup(x):
-    """Clean a string value"""
-    return x if isinstance(x, str) else None
+from mast.services.numerical_models import NumericalModelsService
 
 #
 # Read Excel sheet functions
@@ -256,9 +230,120 @@ def read_xlsx(filename: str, with_images: bool) -> pd.DataFrame:
     
     return experiments, references, run_results, images_dir
 
+def read_numerical_models(conn: APIConnector, filename: str) -> pd.DataFrame:
+    """Read numerical models from the Numerical models sheet"""
+    info("Retrieving known building IDs")
+    experiments = sorted(ExperimentsService(conn).list(), key=lambda x: x['building_id'])
+    
+    sheet_names = pd.ExcelFile(filename).sheet_names
+    
+    buildings_experiments = {}
+    buildings_general_info = {}
+    buildings_material_properties = {}
+    for experiment in experiments:
+        building_id = experiment["building_id"]
+        sheet_name = f"B{building_id}"
+        if sheet_name in sheet_names:
+            debug(f"  Reading sheet: {sheet_name}")
+            buildings_experiments[building_id] = experiment
+            general_info = pd.read_excel(open(filename, "rb"), sheet_name=sheet_name, usecols="A:C", header=13, nrows=13)
+            general_info.columns = ["Field", "Value", "Comment"]
+            general_info["Value"] = general_info["Value"].apply(string_cleanup)
+            general_info["Comment"] = general_info["Comment"].apply(string_cleanup)
+            buildings_general_info[building_id] = general_info
+            material_properties = pd.read_excel(open(filename, "rb"), sheet_name=sheet_name, usecols="A:D", header=28, nrows=9)
+            material_properties.columns = ["Field", "Value", "Unit", "Comment"]
+            material_properties["Value"] = material_properties["Value"].apply(value_cleanup)
+            material_properties["Comment"] = material_properties["Comment"].apply(string_cleanup)
+            buildings_material_properties[building_id] = material_properties
+    
+    return buildings_experiments, buildings_general_info, buildings_material_properties
+
+def to_float(x):
+    if x is None:
+        return None
+    val = x.replace(",", ".")
+    if isinstance(x, str):
+        val = re.sub(r'[^\d.]', '', x)
+    try:
+        return float(val)
+    except:
+        return val
+
+def do_upload_models(conn: APIConnector, filename: str, dry_run: bool) -> None:
+    """Upload a numerical models file to the MAST service
+
+    Args:
+        conn: API Connector instance to use
+        filename: Path to the file to upload
+    """
+    # Check if the file exists
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"File not found: {filename}")
+    info(f"Upload of {filename} to {conn.api_url}")
+    exp_service = ExperimentsService(conn)
+    num_models_service = NumericalModelsService(conn)
+    
+    buildings_experiments, buildings_general_info, buildings_material_properties = read_numerical_models(conn, filename)
+    building_ids = sorted(buildings_experiments.keys())
+    
+    for building_id in tqdm(building_ids, total=len(building_ids), desc="Uploading numerical models", leave=False):
+        experiment = buildings_experiments[building_id]
+        general_info = buildings_general_info[building_id]
+        material_properties = buildings_material_properties[building_id]
+        numerical_model = {
+            "experiment_id": experiment["id"],
+        }
+        general_info_fields = [
+            { "name": "software_used", "label": "Software used", },
+            { "name": "modeling_approach", "label": "Modeling approach", },
+            { "name": "units", "label": "Units of the model", },
+            { "name": "frame_elements", "label": "Element type for frame elements", },
+            { "name": "diaphragm_elements", "label": "Element type for diaphragms", },
+            { "name": "damping_model", "label": "Damping model", },
+            { "name": "global_geometry_def", "label": "Global geometry definition", },
+            { "name": "element_geometry_def", "label": "Element geometry definition", },
+            { "name": "mass_def", "label": "Mass definition", },
+            { "name": "gravity_loads_def", "label": "Gravity loads definition", },
+            { "name": "wall_connections", "label": "Wall-to-wall connections", },
+            { "name": "floor_connections", "label": "Floor-to-wall connections", },
+            { "name": "base_support", "label": "Base support", }
+        ]
+        
+        for field in general_info_fields:
+            numerical_model[field["name"]] = general_info[general_info["Field"] == field["label"]]["Value"].values[0]
+            numerical_model[f"{field['name']}_comment"] = general_info[general_info["Field"] == field["label"]]["Comment"].values[0]
+        
+        material_properties_fields = [
+            { "name": "elastic_modulus", "label": "Elastic modulus of elasticity", },
+            { "name": "shear_modulus", "label": "Shear modulus", },
+            { "name": "compression_strength", "label": "Compression strength", },
+            { "name": "tension_strength", "label": "Tension strength", },
+            { "name": "cohesion", "label": "Cohesion", },
+            { "name": "friction_coeff", "label": "Friction coefficient", },
+            { "name": "residual_friction_coeff", "label": "Residual friction coefficient", },
+            { "name": "damping_ratio", "label": "Damping ratio", },
+            { "name": "softening_coeff", "label": "Softening coefficient", },
+        ]
+
+        for field in material_properties_fields:
+            numerical_model[field["name"]] = to_float(material_properties[material_properties["Field"].str.contains(field["label"])]["Value"].values[0])
+            numerical_model[f"{field['name']}_comment"] = material_properties[material_properties["Field"].str.contains(field["label"])]["Comment"].values[0]
+            if field["name"] == "elastic_modulus":
+                numerical_model[field["name"]] = int(numerical_model[field["name"]]) if numerical_model[field["name"]] is not None else None
+        
+        if dry_run:
+            info(f"  [{building_id}] Numerical model")
+            print_json(numerical_model)
+        else:
+            # delete previous numerical model
+            exp_service.delete_numerical_model(numerical_model["experiment_id"])
+            # create new numerical model
+            num_models_service.create(numerical_model)
+    
 
 def do_upload(conn: APIConnector, filename: str, with_images: bool, dry_run: bool) -> None:
-    """Upload a file to the MAST service
+    """Upload a database file to the MAST service
 
     Args:
         conn: API Connector instance to use

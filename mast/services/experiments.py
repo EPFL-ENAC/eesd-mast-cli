@@ -26,6 +26,12 @@ class ExperimentsService:
     
     def delete_files(self, id, type: str):
         return self.conn.delete(f"/experiments/{id}/{type}-files")
+
+    def get_numerical_model(self, id):
+        return self.conn.get(f"/experiments/{id}/numerical_model")
+    
+    def delete_numerical_model(self, id):
+        return self.conn.delete(f"/experiments/{id}/numerical_model")
     
     def delete_run_results(self, id):
         return self.conn.delete(f"/experiments/{id}/run_results")

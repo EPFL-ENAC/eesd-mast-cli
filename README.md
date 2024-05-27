@@ -68,7 +68,7 @@ The .xlsx file from which the building numerical models are to be uploaded is to
 Command to update the database of building experiments, reference and run results:
 
 ```
-mast upload-models --key xxxxxxx 00_MAST_Database/.xlsx
+mast upload-models --key xxxxxxx 00_MAST_Database/Modeling\ assumptions.xlsx
 ```
 
 ### Building data folders

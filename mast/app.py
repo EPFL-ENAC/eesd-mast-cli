@@ -18,7 +18,8 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False,
 )
 
-default_url = "https://mast-dev.epfl.ch/api"
+#default_url = "https://mast-dev.epfl.ch/api"
+default_url = "http://localhost:8000"
 
 #
 # Data upload

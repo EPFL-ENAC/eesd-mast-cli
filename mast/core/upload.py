@@ -153,23 +153,25 @@ def read_run_results(filename: str, experiment_ids) -> pd.DataFrame:
         results = results.loc[results["Run ID"].apply(run_id_check)]
         results.rename(columns = {
             "Run ID": "run_id",
-            "Nominal PGA X": "nominal_pga_x",
-            "Nominal PGA Y": "nominal_pga_y",
-            "Nominal PGA Z": "nominal_pga_z",
-            "Actual PGA X": "actual_pga_x",
-            "Actual PGA Y": "actual_pga_y",
-            "Actual PGA Z": "actual_pga_z",
+            "Nominal PGA X-dir.": "nominal_pga_x",
+            "Nominal PGA Y-dir.": "nominal_pga_y",
+            "Nominal PGA Z-dir.": "nominal_pga_z",
+            "Actual PGA X-dir.": "actual_pga_x",
+            "Actual PGA Y-dir.": "actual_pga_y",
+            "Actual PGA Z-dir.": "actual_pga_z",
             "DG reported": "dg_reported",
             "DG derived": "dg_derived",
-            "Max. Top Drift X": "max_top_drift_x",
-            "Max. Top Drift Y": "max_top_drift_y",
-            "Res. Top Drift X": "residual_top_drift_x",
-            "Res. Top Drift Y": "residual_top_drift_y",
+            "Max. Top Drift X-dir.": "max_top_drift_x",
+            "Max. Top Drift Y-dir.": "max_top_drift_y",
+            "Res. Top Drift X-dir.": "residual_top_drift_x",
+            "Res. Top Drift Y-dir.": "residual_top_drift_y",
             "Base shear coef.": "base_shear_coef",
-            "Reported T1X": "reported_t1_x",
-            "Reported T1Y": "reported_t1_y",
+            "Reported T1 X-dir.": "reported_t1_x",
+            "Reported T1 Y-dir.": "reported_t1_y",
         }, inplace=True)
         results["run_id"] = results["run_id"].map(lambda x: x if isinstance(x, Number) else x.strip())
+        # Convert id column to string
+        results["run_id"] = results["run_id"].astype(str)
         results["experiment_id"] = np.repeat(i, len(results))
         for col in ["reported_t1_x", "reported_t1_y"]:
             results[col] = results[col].apply(number_cleanup)

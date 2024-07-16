@@ -7,7 +7,9 @@ import typer
 from time import strftime
 from pathlib import Path
 from logging import info, warning, error
+from importlib import resources as impresources
 
+from mast import templates
 from mast.core.io import APIConnector
 from mast.services.experiments import ExperimentsService
 from mast.services.run_results import RunResultsService
@@ -16,8 +18,12 @@ def write_empty_file(parent, name):
   """Create an empty file if it does not exist"""
   path = os.path.join(parent, name)
   if not os.path.exists(path):
-    with open(path, "w"):
-        pass
+    if name.endswith(".png"):
+      missing_file = impresources.files(templates) / "missing.png"
+      shutil.copy(missing_file, path)
+    else:  
+        with open(path, "w"):
+            pass
 
 def write_empty_run_files(run_ids, parent, ext):
   """Create empty files for each run id"""
@@ -81,31 +87,36 @@ def unzip_to_temp_directory(zip_file_path):
 def do_generate_repo(conn: APIConnector, folder: str, id: str = None):
   """Generates the experiment's repository structure"""
   experiment = None
+  experiment_folder = os.path.expanduser(folder)
+  lic_file = impresources.files(templates) / "License-cc-by-sa.md"
+  
+  # test folder
+  test_folder = os.path.join(experiment_folder, "test")
+  os.makedirs(test_folder, exist_ok=True)
+  
   run_ids = ["1", "2", "3"]
   if id:
     experiment = ExperimentsService(conn).get(id)
     run_results = RunResultsService(conn).list({"filter": json.dumps({"experiment_id": int(id)})})
     run_ids = [run_result["run_id"] for run_result in run_results if run_result["run_id"] not in ["Initial", "Final"]]
-  
-  experiment_folder = os.path.expanduser(folder)
-
-  cm_folder = get_crack_maps_folder(experiment_folder)
+    
+  cm_folder = get_crack_maps_folder(test_folder)
   os.makedirs(cm_folder, exist_ok=True)
   write_empty_run_files(run_ids, cm_folder, "png")
   
-  gfdc_folder = get_global_force_displacement_curve_folder(experiment_folder)
+  gfdc_folder = get_global_force_displacement_curve_folder(test_folder)
   os.makedirs(gfdc_folder, exist_ok=True)
   write_empty_run_files(run_ids, gfdc_folder, "txt")
   
-  sta_folder = get_shake_table_accelerations_folder(experiment_folder)
+  sta_folder = get_shake_table_accelerations_folder(test_folder)
   os.makedirs(sta_folder, exist_ok=True)
   write_empty_run_files(run_ids, sta_folder, "txt")
   
-  tdh_folder = get_top_displacement_histories_folder(experiment_folder)
+  tdh_folder = get_top_displacement_histories_folder(test_folder)
   os.makedirs(tdh_folder, exist_ok=True)
   write_empty_run_files(run_ids, tdh_folder, "txt")
 
-  rdm_path = os.path.join(experiment_folder, "README.md")
+  rdm_path = os.path.join(test_folder, "README.md")
   if not os.path.exists(rdm_path):
     with open(rdm_path, "w") as f:
       if experiment:
@@ -118,6 +129,36 @@ def do_generate_repo(conn: APIConnector, folder: str, id: str = None):
       else:
         f.write(f"\n_experiment_description_\n")
       f.write(f"\n## Generated on {strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+  lic_path = os.path.join(test_folder, "License.md")
+  if not os.path.exists(lic_path):
+    shutil.copy(lic_file, lic_path)
+
+  # plan folder
+  plan_folder = os.path.join(experiment_folder, "plan")
+  os.makedirs(plan_folder, exist_ok=True)
+  write_empty_file(plan_folder, "plan.png")
+  
+  prdm_path = os.path.join(plan_folder, "README.md")
+  if not os.path.exists(prdm_path):
+    shutil.copy(rdm_path, prdm_path)
+  lic_path = os.path.join(plan_folder, "License.md")
+  if not os.path.exists(lic_path):
+    shutil.copy(lic_file, lic_path)
+  
+  # model folder
+  model_folder = os.path.join(experiment_folder, "model")
+  opensees_folder = os.path.join(model_folder, "OpenSees")
+  os.makedirs(opensees_folder, exist_ok=True)
+  
+  mrdm_path = os.path.join(model_folder, "README.md")
+  if not os.path.exists(mrdm_path):
+    shutil.copy(rdm_path, mrdm_path)
+  lic_path = os.path.join(model_folder, "License.md")
+  if not os.path.exists(lic_path):
+    shutil.copy(lic_file, lic_path)
+  write_empty_file(model_folder, "scheme.png")
+  write_empty_file(model_folder, "geometry.vtk")
 
   return experiment_folder
 

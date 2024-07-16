@@ -9,10 +9,10 @@ from pathlib import Path
 from logging import info, warning, error
 from importlib import resources as impresources
 
-from mast import templates
-from mast.core.io import APIConnector
-from mast.services.experiments import ExperimentsService
-from mast.services.run_results import RunResultsService
+from mastdb import templates
+from mastdb.core.io import APIConnector
+from mastdb.services.experiments import ExperimentsService
+from mastdb.services.run_results import RunResultsService
 
 def write_empty_file(parent, name):
   """Create an empty file if it does not exist"""

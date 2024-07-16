@@ -12,12 +12,12 @@ from tqdm import tqdm
 from openpyxl import load_workbook
 from openpyxl_image_loader import SheetImageLoader
 
-from mast.core.utils import print_json, value_cleanup, number_cleanup, array_formatter, yesno_cleanup, string_cleanup
-from mast.core.io import APIConnector
-from mast.services.references import ReferencesService
-from mast.services.experiments import ExperimentsService
-from mast.services.run_results import RunResultsService
-from mast.services.numerical_models import NumericalModelsService
+from mastdb.core.utils import print_json, value_cleanup, number_cleanup, array_formatter, yesno_cleanup, string_cleanup
+from mastdb.core.io import APIConnector
+from mastdb.services.references import ReferencesService
+from mastdb.services.experiments import ExperimentsService
+from mastdb.services.run_results import RunResultsService
+from mastdb.services.numerical_models import NumericalModelsService
 
 #
 # Read Excel sheet functions

@@ -1,6 +1,6 @@
 import json
-from mast.core.io import APIConnector
-from mast.services.files import FilesService
+from mastdb.core.io import APIConnector
+from mastdb.services.files import FilesService
 
 class ExperimentsService:
     def __init__(self, conn: APIConnector):

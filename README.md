@@ -2,19 +2,21 @@
 
 MAST (MAsonry Shake-Table) is a comprehensive database and collaborative resource for advancing seismic assessment of unreinforced masonry buildings.
 
+The associated public website is [https://masonrydb.epfl.ch/](https://masonrydb.epfl.ch/).
+
 Visit [EESD lab at EPFL](https://www.epfl.ch/labs/eesd/).
 
-This tool is a command-line interface to the MAST API, for data upload, extraction and analysis.
+This tool is a command-line interface to the MAST database API, for data upload, extraction and analysis.
 
 Usage:
 
 ```
-mast --help
+mastdb --help
 ```
 
 ## Buildings Database
 
-The buildings folder contains the data for provisionning the MAST web application, using the mast CLI.
+The buildings folder contains the data for provisionning the MAST web application, using the `mastdb` command line interface.
 
 ```
 .
@@ -58,7 +60,7 @@ The .xlsx file from which the building experiments (experiment description, refe
 Command to update the database of building experiments, reference and run results:
 
 ```
-mast upload --key xxxxxxx 00_MAST_Database/Shake_Table_Tests_Database_XXXXX.xlsx
+mastdb upload --key xxxxxxx 00_MAST_Database/Shake_Table_Tests_Database_XXXXX.xlsx
 ```
 
 #### Building numerical models
@@ -68,7 +70,7 @@ The .xlsx file from which the building numerical models are to be uploaded is to
 Command to update the database of building experiments, reference and run results:
 
 ```
-mast upload-models --key xxxxxxx 00_MAST_Database/Modeling\ assumptions.xlsx
+mastdb upload-models --key xxxxxxx 00_MAST_Database/Modeling\ assumptions.xlsx
 ```
 
 ### Building data folders
@@ -100,37 +102,37 @@ Provide one data folder per building. The naming conventions are:
 Command to update all the database files:
 
 ```
-mast upload-repo-bulk --key xxxxxxx 00_MAST_Database
+mastdb upload-repo-bulk --key xxxxxxx 00_MAST_Database
 ```
 
 Command to update a specific type of database files of a specific Building:
 
 ```
-mast upload-repo --key xxxxxxx --type model 1 00_MAST_Database/001_Beyer_2015/model
+mastdb upload-repo --key xxxxxxx --type model 1 00_MAST_Database/001_Beyer_2015/model
 ```
 
 Command to remove a specific type of database files of a specific Building:
 
 ```
-mast rm-repo --key xxxxxxx --type model 1
+mastdb rm-repo --key xxxxxxx --type model 1
 ```
 
 In order to help with the setup and the validation of an experiment's local repository, use the commands:
 
 ```
-mast generate-repo --help
+mastdb generate-repo --help
 ```
 
 To validate an existing experiment data files repository, use the command:
 
 ```
-mast validate-repo --help
+mastdb validate-repo --help
 ```
 
 To download an experiment data files repository into a local folder, use the command:
 
 ```
-mast download-repo --help
+mastdb download-repo --help
 ```
 
 ## Development
@@ -144,5 +146,5 @@ poetry install
 Run command line
 
 ```
-poetry run mast --help
+poetry run mastdb --help
 ```

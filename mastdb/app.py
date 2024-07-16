@@ -2,14 +2,14 @@ import typer
 import json
 import os
 from logging import INFO, basicConfig, info, warning, error
-from mast.core.utils import print_json, print_output
-from mast.core.upload import do_upload, do_upload_models
-from mast.core.repo import do_generate_repo, do_validate_repo, do_upload_repo
-from mast.services.references import ReferencesService
-from mast.services.experiments import ExperimentsService
-from mast.services.run_results import RunResultsService
-from mast.services.numerical_models import NumericalModelsService
-from mast.core.io import APIConnector
+from mastdb.core.utils import print_json, print_output
+from mastdb.core.upload import do_upload, do_upload_models
+from mastdb.core.repo import do_generate_repo, do_validate_repo, do_upload_repo
+from mastdb.services.references import ReferencesService
+from mastdb.services.experiments import ExperimentsService
+from mastdb.services.run_results import RunResultsService
+from mastdb.services.numerical_models import NumericalModelsService
+from mastdb.core.io import APIConnector
 
 # Initialise the Typer class
 app = typer.Typer(

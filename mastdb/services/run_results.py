@@ -1,4 +1,4 @@
-from mast.core.io import APIConnector
+from mastdb.core.io import APIConnector
 
 class RunResultsService:
     def __init__(self, conn: APIConnector):

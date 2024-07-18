@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mastdb"
-version = "0.1.0"
+version = "1.0.0"
 description = "MAsonryShake-Table CLI"
 license = "GPL-3.0-or-later"
 authors = ["ymarcon <yannick.marcon@epfl.ch>"]

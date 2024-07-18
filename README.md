@@ -8,6 +8,12 @@ Visit [EESD lab at EPFL](https://www.epfl.ch/labs/eesd/).
 
 This tool is a command-line interface to the MAST database API, for data upload, extraction and analysis.
 
+Installation:
+
+```
+pip install mastdb
+```
+
 Usage:
 
 ```
@@ -134,6 +140,54 @@ To download an experiment data files repository into a local folder, use the com
 ```
 mastdb download-repo --help
 ```
+
+## Cookbook
+
+The following recipes will help site maintainers to update, delete or add content to the MAST database.
+
+### What is the official MAST database website?
+
+The official MAST database website is located at [https://masonrydb.epfl.ch/](https://masonrydb.epfl.ch/). The website is for humans exploring the content of the database. For the site maintainers, the address to be provided to the `mastdb` command line is [https://masonrydb.epfl.ch/api](https://masonrydb.epfl.ch/api).
+
+### Is there a MAST database website that I can use as a playground?
+
+Yes, from the EPFL intranet, you can use the website [https://mast-dev.epfl.ch/](https://mast-dev.epfl.ch/) as a playground. Similarly to the official website, the address to provide for updating database content is [https://mast-dev.epfl.ch/api](https://mast-dev.epfl.ch/api).
+
+If you are not sure about the kind of operation and/or the data content you want to send to the database, it is recommended to use this website as a playground.
+
+### How can I add/update a building?
+
+The content updated is based on the Excel file that was originally defined. You can refer to it to add or modify the content of the database: 
+
+* Reference: define the associated paper information, that can be referred by several buildings.
+* Building: each building has an identifier that you provide (which can be different from the record identifier in the database). Make sure that this identifier is unique, as it is to used to perform updates or deletions.
+* Tests results: use the table conventions from the Excel file (do not change column names).
+
+### How can I delete a building?
+
+You can delete a building by its identifier. It will also delete the associated files and test results.
+
+### How can I delete only the files a building?
+
+You can delete the files of a building by its identifier and the type of files (plan, model or test).
+
+### How can I upload the various type of files?
+
+1. Make sure the building exists in the database (not just in the Excel file).
+2. When it is the first time files are uploaded for that building, use the `mastdb generate-repo` command in a directory of your choice. This command will prepopulate folders hierarchy, with dummy files. More specifically, pay attention to the test results file names, as proper naming is required to link observed data and crack images to the test results defined in the database.
+3. It is highly recommended to provide a README and a License files.
+
+### What is an experiment?
+
+An experiment is the same as a building.
+
+### What is the 'key' in the command arguments?
+
+One need to authenticate itself to perform 'write' operations (add, update or delete). The MAST database uses a simple authentication mechanism based on a API key (to be requested to ENAC IT4R team).
+
+### Where are the data originally used to provision the database?
+
+See the [MAST DB project data folder](https://epflch.sharepoint.com/:f:/r/sites/ENAC-IT/Documents%20partages/Research%20IT/Advanced%20Services/0145%20%E2%80%93%20MAST%20Open%20DB/Data/00_MAST_Database?csf=1&web=1&e=brnmh1) (requires proper access, ask ENAC IT4R team).
 
 ## Development
 

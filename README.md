@@ -155,7 +155,11 @@ Yes, from the EPFL intranet, you can use the website [https://mast-dev.epfl.ch/]
 
 If you are not sure about the kind of operation and/or the data content you want to send to the database, it is recommended to use this website as a playground.
 
-### How can I add/update a building?
+### What are experiments, run results and numerical models? Where are the buildings?
+
+An experiment is an experiment made on a building. Resulting from this experiment, there are run results. Similarly, a numerical model is a numerical model of a building. In the database, there is no building per-say: both experiments and numerical models refer to their associated building by an identifier (1, 2, 3 etc.), then make sure this identifier is used consistently in the database operations.
+
+### How can I add/update an experiment of a building?
 
 The content updated is based on the Excel file that was originally defined. You can refer to it to add or modify the content of the database: 
 
@@ -163,7 +167,7 @@ The content updated is based on the Excel file that was originally defined. You 
 * Building: each building has an identifier that you provide (which can be different from the record identifier in the database). Make sure that this identifier is unique, as it is to used to perform updates or deletions.
 * Tests results: use the table conventions from the Excel file (do not change column names).
 
-### How can I delete a building?
+### How can I delete an experiment of a building?
 
 You can delete a building by its identifier. It will also delete the associated files and test results.
 
@@ -175,11 +179,15 @@ You can delete the files of a building by its identifier and the type of files (
 
 1. Make sure the building exists in the database (not just in the Excel file).
 2. When it is the first time files are uploaded for that building, use the `mastdb generate-repo` command in a directory of your choice. This command will prepopulate folders hierarchy, with dummy files. More specifically, pay attention to the test results file names, as proper naming is required to link observed data and crack images to the test results defined in the database.
-3. It is highly recommended to provide a README and a License files.
+3. It is highly recommended to provide README and License files.
 
-### What is an experiment?
+### How can I add/update a numerical model?
 
-An experiment is the same as a building.
+Just like for the experiments, adding/updating numerical models of buildings is to be done using an Excel file. See the original 'Modeling assumptions.xlsx' file as a reference. Make sure to not modify the field names, and also to be consistent with the identification of the building (use same building id as for the experiments) and with the reference name.
+
+### How can I delete a numerical model?
+
+You can delete a numerical model by its building identifier.
 
 ### What is the 'key' in the command arguments?
 

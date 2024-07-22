@@ -48,7 +48,7 @@ def upload(
         help="Dry run, do not upload to the database, just print read data"
     ),
     ) -> None:
-    """Import an Excel file with metadata to the database. References and experiments will be created or updated.
+    """Import an Excel file with buildings data to the database. References, experiments and run results will be created or updated.
     """
     do_upload(APIConnector(url, key), filename, images, dry_run)
 
@@ -71,7 +71,7 @@ def upload_models(
         help="Dry run, do not upload to the database, just print read data"
     ),
     ) -> None:
-    """Import an Excel file with metadata to the database. Numerical models will be created or updated.
+    """Import an Excel file with numerical models data to the database. Numerical models will be created or updated. Requires the buildings to have been uploaded first.
     """
     do_upload_models(APIConnector(url, key), filename, dry_run)
     

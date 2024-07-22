@@ -22,6 +22,10 @@ mastdb --help
 
 ## Buildings Database
 
+The different MAST database entities are linked as follows:
+
+![MAST DB diagram](https://raw.githubusercontent.com/EPFL-ENAC/eesd-mast/main/docs/mastdb.png)
+
 The buildings folder contains the data for provisionning the MAST web application, using the `mastdb` command line interface.
 
 ```
